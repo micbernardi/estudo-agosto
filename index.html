@@ -497,6 +497,7 @@ self.onmessage=async(ev)=>{
 const $=id=>document.getElementById(id);
 const LS_KEY='simulador_setorizacao_ago26';
 const LNAME=['PRIME','INFINITY'];
+const MEDIA_MIN=119886; // piso de media mensal (YTD/6)
 const LKEY=['P','I'];
 
 const S={
@@ -925,6 +926,7 @@ function recompute(){
     cache.bsY=computeBrickSums('ytd');
     cache.stY=computeSectorTotals(cache.bsY);
   }else{cache.bsY=null;cache.stY=null;}
+  cache.nYtdM=periodDef('ytd').cur.length;
   cache.pend=pendingBricks();
 }
 function renderAll(){
@@ -1098,7 +1100,7 @@ function renderTeams(){
       ${stY?`<span style="color:var(--mut);font-size:12px">YTD <b class="num" style="color:var(--txt)">${fmtBRL(ty)}</b> ${evoHtml(ty,tyr)}</span>`:''}
       <span class="ttot num">${fmtBRL(tc)}</span><span class="tev">${evoHtml(tc,tr,pd.refLbl)}</span>
     </div><table class="stbl"><thead><tr>
-      <th>Setor</th><th>Nome</th><th class="r">Bricks</th><th class="r">${esc(pd.lbl)}</th><th class="r">Evo ${esc(pd.lbl)}</th>${stY?'<th class="r">YTD 26</th><th class="r">Evo YTD</th>':''}
+      <th>Setor</th><th>Nome</th><th class="r">Bricks</th><th class="r">Média Mês</th><th class="r">${esc(pd.lbl)}</th><th class="r">Evo ${esc(pd.lbl)}</th>${stY?'<th class="r">YTD 26</th><th class="r">Evo YTD</th>':''}
     </tr></thead><tbody>`;
     for(const i of team.sIdxs){
       const s=S.setores[i],t=st[i];
@@ -1114,6 +1116,7 @@ function renderTeams(){
           ${t.recv||t.lost?`<span class="badge bAlt">${t.recv?'+'+t.recv:''}${t.recv&&t.lost?' ':''}${t.lost?'-'+t.lost:''}</span>`:''}
           ${s.semVendas?'<span class="badge bZero">sem vendas</span>':''}</td>
         <td class="snb num r">${t.nb}</td>
+        ${(()=>{const mm=(stY?stY[i].cur:t.cur)/cache.nYtdM;return `<td class="snb num r" style="${mm<MEDIA_MIN?'color:var(--neg);font-weight:700':''}">${fmtBRL(mm)}</td>`;})()}
         <td class="sval num r">${fmtBRL(t.cur)}</td>
         <td class="sev num r">${evoHtml(t.cur,t.ref)}</td>
         ${stY?`<td class="sval num r" style="font-weight:600">${fmtBRL(stY[i].cur)}</td>
@@ -1162,11 +1165,12 @@ function renderMarcas(){
       <td class="td-r">${evoHtml(cur[m],ref[m])}</td>
       ${showY?`<td class="td-r num">${fmtBRL(curY[m])}</td>
       <td class="td-r">${evoHtml(curY[m],refY[m])}</td>`:''}
+      <td class="td-r num" style="color:var(--mut)">${fmtBRL((showY?curY[m]:cur[m])/cache.nYtdM)}</td>
       <td class="td-r"><button class="linkbtn${off?'':' warn'}" onclick="toggleMarcaOff(${m})">${off?'restaurar':'excluir'}</button></td>
     </tr>`;
   }
   $('marcasView').innerHTML=`<p style="color:var(--mut);font-size:12.5px;margin-bottom:12px">Ao trocar a linha de uma marca, as vendas dela em cada brick passam a contar para o setor da nova linha que atende aquele brick. Marcas excluídas saem de todos os totais da simulação. Período: ${esc(pd.lbl)}.</p>
-  <table><thead><tr><th>Marca</th><th>Linha na simulação</th><th class="td-r">${esc(pd.lbl)}</th><th class="td-r">Evo ${esc(pd.lbl)}</th>${showY?'<th class="td-r">YTD 26</th><th class="td-r">Evo YTD</th>':''}<th class="td-r"></th></tr></thead><tbody>${rows}</tbody></table>`;
+  <table><thead><tr><th>Marca</th><th>Linha na simulação</th><th class="td-r">${esc(pd.lbl)}</th><th class="td-r">Evo ${esc(pd.lbl)}</th>${showY?'<th class="td-r">YTD 26</th><th class="td-r">Evo YTD</th>':''}<th class="td-r">Média Mês</th><th class="td-r"></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 // marcas excluidas por padrao da simulacao
 const DEFAULT_OFF=['NIMEGON','NIMEGON MET','HIXIZINE'];
