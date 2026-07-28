@@ -118,6 +118,7 @@ input,select{font-family:inherit}
 .teamhead .tname{font-family:'Archivo';font-weight:800;font-size:15px;letter-spacing:.06em}
 .teamhead .ttot{font-family:'Archivo';font-weight:700;font-size:15px;margin-left:auto}
 .teamhead .tev{font-size:12px}
+.teamsel{background:var(--panel);border:1px solid var(--border2);border-radius:6px;color:var(--txt);padding:4px 8px;font-size:12px}
 .stbl{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 .stbl thead th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut2);font-weight:600;padding:8px 12px;background:var(--panel2);border-bottom:1px solid var(--border)}
 .stbl thead th.r, .stbl td.r{text-align:right}
@@ -231,9 +232,9 @@ tr.moff td .badge{opacity:1}
       <input id="searchInp" placeholder="Buscar brick ou cidade..." autocomplete="off">
       <div id="searchDrop"></div>
     </div>
+    <button class="btn" id="btnNewFiles">Novos arquivos</button>
     <button class="btn" id="btnChanges">Alterações</button>
     <button class="btn" id="btnExportSet">Exportar setorização</button>
-    <button class="btn" id="btnExport">Exportar resumo</button>
     <button class="btn danger" id="btnReset">Resetar</button>
   </div>
 
@@ -508,6 +509,7 @@ const S={
   marcaOv:new Map(),      // mId -> L
   marcaOff:new Set(),     // mIds excluidas da simulacao
   linhaOv:new Map(),      // sIdx -> linha simulada (setor convertido)
+  teamOv:new Map(),       // sIdx -> nome da equipe simulada
   period:'mes',
   filesEstudo:null,filesBase:null,
 };
@@ -553,7 +555,7 @@ $('fileBase').onchange=e=>{
 function checkReady(){$('btnProcess').disabled=!S.filesBase;}
 try{
   const saved=JSON.parse(localStorage.getItem(LS_KEY)||'null');
-  if(saved&&((saved.mb&&saved.mb.length)||(saved.mo&&saved.mo.length)||(saved.mx&&saved.mx.length)||(saved.sl&&saved.sl.length))){
+  if(saved&&((saved.mb&&saved.mb.length)||(saved.mo&&saved.mo.length)||(saved.mx&&saved.mx.length)||(saved.sl&&saved.sl.length)||(saved.tv&&saved.tv.length))){
     $('restoreNote').style.display='block';
     $('restoreNote').textContent='Existe uma simulação salva neste navegador ('+(saved.mb?saved.mb.length:0)+' bricks movidos, '+(saved.mo?saved.mo.length:0)+' marcas trocadas, '+(saved.mx?saved.mx.length:0)+' marcas excluídas). Ela será reaplicada após o processamento.';
   }
@@ -570,6 +572,8 @@ $('btnProcess').onclick=async()=>{
     setProg(5,'Lendo base de vendas...');
     const buffer=await S.filesBase.arrayBuffer();
     await runWorker(buffer);
+    setProg(99,'Salvando dados no navegador...');
+    await idbSave().catch(()=>{});
     buildTeams();
     applyDefaultOff();
     applySaved();
@@ -581,6 +585,75 @@ $('btnProcess').onclick=async()=>{
     $('btnProcess').disabled=false;
     console.error(err);
   }
+};
+/* ---------- cache dos dados processados (IndexedDB) ---------- */
+const IDB_NAME='simulador_setorizacao',IDB_STORE='dados';
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const rq=indexedDB.open(IDB_NAME,1);
+    rq.onupgradeneeded=()=>rq.result.createObjectStore(IDB_STORE);
+    rq.onsuccess=()=>res(rq.result);
+    rq.onerror=()=>rej(rq.error);
+  });
+}
+function idbSave(){
+  const payload={
+    savedAt:Date.now(),
+    months:S.months,nM:S.nM,
+    bricks:S.bricks,marcas:S.marcas.map(m=>({name:m.name,linha:m.linha})),
+    setores:S.setores.filter(x=>!x.semVendas).map(x=>({code:x.code,num:x.num,nome:x.nome,linha:x.linha})),
+    study:S.study||null,
+    bArr:S.bArr.buffer,mArr:S.mArr.buffer,vArr:S.vArr.buffer
+  };
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(payload,'v1');
+    tx.oncomplete=()=>{db.close();res();};
+    tx.onerror=()=>{db.close();rej(tx.error);};
+  }));
+}
+function idbLoad(){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const rq=db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).get('v1');
+    rq.onsuccess=()=>{db.close();res(rq.result||null);};
+    rq.onerror=()=>{db.close();rej(rq.error);};
+  })).catch(()=>null);
+}
+function idbClear(){
+  return idbOpen().then(db=>new Promise(res=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete('v1');
+    tx.oncomplete=()=>{db.close();res();};
+    tx.onerror=()=>{db.close();res();};
+  })).catch(()=>{});
+}
+function bootFromCache(d){
+  S.months=d.months;S.nM=d.nM;
+  S.bricks=d.bricks;S.marcas=d.marcas;S.setores=d.setores;
+  S.study=d.study||null;
+  S.studyByNum=new Map();
+  if(S.study)S.study.teams.forEach(t=>t.sectors.forEach(x=>S.studyByNum.set(x.num,x)));
+  S.bArr=new Int32Array(d.bArr);S.mArr=new Int16Array(d.mArr);S.vArr=new Float64Array(d.vArr);
+  S.nCombos=S.bArr.length;
+  buildTeams();
+  applyDefaultOff();
+  applySaved();
+  $('uploadScreen').style.display='none';
+  $('app').style.display='block';
+  renderAll();
+  const dt=new Date(d.savedAt);
+  toast('Dados carregados do navegador (processados em '+dt.toLocaleDateString('pt-BR')+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+')');
+}
+(async()=>{
+  const d=await idbLoad();
+  if(d&&d.bArr&&d.months){
+    bootFromCache(d);
+  }
+})();
+$('btnNewFiles').onclick=async()=>{
+  if(!confirm('Carregar novos arquivos? Os dados atuais salvos no navegador serão substituídos ao processar. As alterações da simulação continuam salvas.'))return;
+  $('app').style.display='none';
+  $('uploadScreen').style.display='block';
 };
 function setProg(pct,txt){
   $('progFill').style.width=pct+'%';
@@ -607,12 +680,19 @@ async function parseEstudo(file){
         else if(c==='LINHA ATUAL')ci.linha=i;
         else if(c==='STATUS')ci.status=i;
         else if(c==='NOVA SEDE')ci.sede=i;
+        else if(c==='REGIONAL')ci.reg=i;
+        else if(c==='PLACA')ci.placa=i;
+        else if(c.startsWith('VEICULO'))ci.veic=i;
+        else if(c.startsWith('OBSERVACAO'))ci.obs=i;
+        else if(c.startsWith('DATA ADMISS'))ci.adm=i;
+        else if(c==='DDD')ci.ddd=i;
+        else if(c==='TELEFONE')ci.tel=i;
       });
       break;
     }
   }
   if(hIdx<0)throw new Error('Aba do estudo sem coluna SETOR NOVO');
-  const teams=[];let cur=null;
+  const teams=[];let cur=null,grRow=null;
   for(let r=hIdx+1;r<rows.length;r++){
     const row=rows[r]||[];
     const nome=row[ci.nome];
@@ -625,7 +705,23 @@ async function parseEstudo(file){
     const num=parseInt(novo,10);
     if(!num||!nome)continue;
     const status=normTxt(row[ci.status]);
-    if(status==='GR')continue;
+    const raw={
+      regional:row[ci.reg]!=null?String(row[ci.reg]).trim():'',
+      placa:ci.placa!==undefined?String(row[ci.placa]||'').trim():'',
+      veiculo:ci.veic!==undefined?String(row[ci.veic]||'').trim():'',
+      obs:ci.obs!==undefined?String(row[ci.obs]||'').trim():'',
+      adm:ci.adm!==undefined?row[ci.adm]:null,
+      ddd:ci.ddd!==undefined?String(row[ci.ddd]||'').trim():'',
+      tel:ci.tel!==undefined?String(row[ci.tel]||'').trim():'',
+      statusTxt:ci.status!==undefined?String(row[ci.status]||'').trim():''
+    };
+    if(status==='GR'){
+      grRow={num,nome:String(nome).replace(/\u00a0/g,' ').trim(),
+        linhaTxt:String(row[ci.linha]||'').trim(),
+        espelho:row[ci.esp]||'',antigo:row[ci.ant]||'',
+        sede:ci.sede!==undefined?String(row[ci.sede]||'').trim():'',...raw};
+      continue;
+    }
     if(!cur){cur={name:'EQUIPE',sectors:[]};teams.push(cur);}
     cur.sectors.push({
       num,
@@ -633,10 +729,11 @@ async function parseEstudo(file){
       linha:normTxt(row[ci.linha]).includes('PRIME')&&!normTxt(row[ci.linha]).includes('INFINITY')?0:(normTxt(row[ci.linha]).includes('INFINITY')?1:-1),
       espelho:row[ci.esp]||'',
       antigo:row[ci.ant]||'',
-      sede:ci.sede!==undefined?String(row[ci.sede]||'').trim():''
+      sede:ci.sede!==undefined?String(row[ci.sede]||'').trim():'',
+      ...raw
     });
   }
-  S.study={teams};
+  S.study={teams,gr:grRow};
   S.studyByNum=new Map();
   teams.forEach(t=>t.sectors.forEach(s=>S.studyByNum.set(s.num,s)));
 }
@@ -712,6 +809,32 @@ function buildTeams(){
       S.teams.push({name:'TODOS OS SETORES',sIdxs:rest});
     }
   }
+  // guardar agrupamento original e aplicar movimentos de equipe simulados
+  S.teamsBase=S.teams.map(t=>({name:t.name,sIdxs:t.sIdxs.slice()}));
+  for(const t of S.teams)for(const i of t.sIdxs)S.setores[i].teamOrig=t.name;
+  applyTeamOv();
+}
+function applyTeamOv(){
+  S.teams=S.teamsBase.map(t=>({name:t.name,sIdxs:t.sIdxs.slice()}));
+  const byName=new Map(S.teams.map(t=>[t.name,t]));
+  for(const[i,name]of S.teamOv){
+    const dest=byName.get(name);
+    if(!dest||S.setores[i].teamOrig===name){S.teamOv.delete(i);continue;}
+    for(const t of S.teams){
+      const p=t.sIdxs.indexOf(i);
+      if(p>=0)t.sIdxs.splice(p,1);
+    }
+    dest.sIdxs.push(i);
+  }
+}
+function moveTeam(i,name){
+  if(!name)return;
+  if(S.setores[i].teamOrig===name)S.teamOv.delete(i);
+  else S.teamOv.set(i,name);
+  applyTeamOv();
+  renderAll();
+  if(modalSector>=0)renderSectorModal();
+  toast(S.setores[i].num+' agora na equipe '+name);
 }
 // bricks cujo setor atual e um setor desligado (por linha)
 function pendingBricks(){
@@ -820,7 +943,7 @@ function renderSummary(){
     rp+=cache.bs.ref[b*2];ri+=cache.bs.ref[b*2+1];
   }
   const tot=tp+ti,rtot=rp+ri;
-  const nChg=S.brickOv.size+S.marcaOv.size+S.marcaOff.size+S.linhaOv.size;
+  const nChg=S.brickOv.size+S.marcaOv.size+S.marcaOff.size+S.linhaOv.size+S.teamOv.size;
   const nPend=cache.pend[0].length+cache.pend[1].length;
   let pendVal=0;
   for(let L=0;L<2;L++)for(const r of cache.pend[L])pendVal+=cache.bs.cur[r.b*2+L];
@@ -986,6 +1109,7 @@ function renderTeams(){
         <td class="snum num" title="Linha ${LNAME[L]}"><i></i>${s.num}</td>
         <td class="snome">${esc(s.nomeEstudo||s.nome)}
           ${conv?`<span class="badge bAlt">convertido para ${LNAME[L]}</span>`:''}
+          ${S.teamOv.has(i)?`<span class="badge bAlt">de ${esc(S.setores[i].teamOrig||'')}</span>`:''}
           ${nConf?`<span class="badge bZero">${nConf} conflito${nConf>1?'s':''}</span>`:''}
           ${t.recv||t.lost?`<span class="badge bAlt">${t.recv?'+'+t.recv:''}${t.recv&&t.lost?' ':''}${t.lost?'-'+t.lost:''}</span>`:''}
           ${s.semVendas?'<span class="badge bZero">sem vendas</span>':''}</td>
@@ -1159,6 +1283,10 @@ function renderSectorModal(){
   let meta=`${esc(pd.lbl)}: <b class="num" style="color:var(--txt)">${fmtBRL(st.cur)}</b> ${evoHtml(st.cur,st.ref,pd.refLbl)} , ${st.nb} bricks`;
   if(conv&&confs.length)meta+=` , <span style="color:var(--neg);font-weight:600">${confs.length} brick${confs.length>1?'s':''} em conflito</span>`;
   if(s.antigo)meta+=`<br>Setor antigo: ${esc(s.antigo)}${s.espelho?' , espelho: '+esc(s.espelho):''}`;
+  if(S.teams.length>1){
+    const curTeam=(S.teams.find(t=>t.sIdxs.includes(modalSector))||{}).name||'';
+    meta+=`<br>Equipe: <select class="teamsel" onchange="moveTeam(${modalSector},this.value)">${S.teams.map(t=>`<option value="${esc(t.name)}" ${t.name===curTeam?'selected':''}>${esc(t.name)}</option>`).join('')}</select>${S.teamOv.has(modalSector)?` <span style="color:var(--alt);font-size:11.5px">movido, original: ${esc(s.teamOrig||'')}</span>`:''}`;
+  }
   meta+=`<br>${conv
     ?`<button class="linkbtn" onclick="revertConversion(${modalSector})">Desfazer conversão (voltar para ${LNAME[s.linha]})</button>`
     :`<button class="linkbtn" onclick="convertSector(${modalSector})">Converter setor para ${LNAME[1-L]}</button>`}`;
@@ -1305,6 +1433,12 @@ function openChanges(){
       <span style="flex:1"><b>${esc(S.marcas[m].name)}</b><br><span style="color:var(--mut);font-size:11.5px">${LNAME[S.marcas[m].linha]} para ${LNAME[L]}</span></span>
       <button class="linkbtn" onclick="setMarcaLinha(${m},${S.marcas[m].linha});openChanges()">desfazer</button></li>`;
   }
+  for(const[i,name]of S.teamOv){
+    const sx=S.setores[i];
+    html+=`<li><span class="badge bAlt">EQUIPE</span>
+      <span style="flex:1"><b>${sx.num} - ${esc(sx.nomeEstudo||sx.nome)}</b><br><span style="color:var(--mut);font-size:11.5px">${esc(sx.teamOrig||'')} para ${esc(name)}</span></span>
+      <button class="linkbtn" onclick="moveTeam(${i},'${esc(sx.teamOrig||'')}');openChanges()">desfazer</button></li>`;
+  }
   for(const[i,L]of S.linhaOv){
     const sx=S.setores[i];
     html+=`<li><span class="badge bAlt">SETOR</span>
@@ -1342,9 +1476,9 @@ document.querySelectorAll('#tabs button').forEach(b=>{
   };
 });
 $('btnReset').onclick=()=>{
-  if(!S.brickOv.size&&!S.marcaOv.size&&!S.marcaOff.size&&!S.linhaOv.size){toast('Nenhuma alteração para resetar');return;}
+  if(!S.brickOv.size&&!S.marcaOv.size&&!S.marcaOff.size&&!S.linhaOv.size&&!S.teamOv.size){toast('Nenhuma alteração para resetar');return;}
   if(!confirm('Descartar todas as alterações da simulação?'))return;
-  S.brickOv.clear();S.marcaOv.clear();S.marcaOff.clear();S.linhaOv.clear();
+  S.brickOv.clear();S.marcaOv.clear();S.marcaOff.clear();S.linhaOv.clear();S.teamOv.clear();applyTeamOv();
   applyDefaultOff();
   localStorage.removeItem(LS_KEY);
   renderAll();
@@ -1402,7 +1536,9 @@ function saveLS(){
     for(const m of S.marcaOff)mx.push(S.marcas[m].name);
     const sl=[];
     for(const[i,L]of S.linhaOv)sl.push([S.setores[i].num,LKEY[L]]);
-    localStorage.setItem(LS_KEY,JSON.stringify({mb,mo,mx,sl}));
+    const tv=[];
+    for(const[i,name]of S.teamOv)tv.push([S.setores[i].num,name]);
+    localStorage.setItem(LS_KEY,JSON.stringify({mb,mo,mx,sl,tv}));
   }catch(e){}
 }
 function applySaved(){
@@ -1419,6 +1555,12 @@ function applySaved(){
     const L=lk==='P'?0:1;
     if(S.setores[i].linha!==L){S.linhaOv.set(i,L);n++;}
   }
+  for(const[num,name]of(saved.tv||[])){
+    const i=setorByNum.get(num);
+    if(i===undefined)continue;
+    if(S.setores[i].teamOrig!==name){S.teamOv.set(i,name);n++;}
+  }
+  if(S.teamOv.size)applyTeamOv();
   for(const[bn,lk,destNum]of(saved.mb||[])){
     const b=brickByName.get(bn),dest=setorByNum.get(destNum);
     const L=lk==='P'?0:1;
@@ -1444,97 +1586,94 @@ function applySaved(){
   if(n)setTimeout(()=>toast(n+' alterações da simulação anterior reaplicadas'),400);
 }
 
-/* ---------- export setorizacao (formato da base original, com destaques) ---------- */
-function xesc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+/* ---------- export setorizacao (formato do estudo, sem numeros de resultado) ---------- */
+function xesc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function colRef(c){let s='';c++;while(c>0){const m=(c-1)%26;s=String.fromCharCode(65+m)+s;c=Math.floor((c-1)/26);}return s;}
+function admStr(v){
+  if(v==null||v==='')return'';
+  if(typeof v==='number'&&v>20000){const d=new Date(Date.UTC(1899,11,30)+v*86400000);return('0'+d.getUTCDate()).slice(-2)+'/'+('0'+(d.getUTCMonth()+1)).slice(-2)+'/'+d.getUTCFullYear();}
+  return String(v).trim();
+}
 $('btnExportSet').onclick=async()=>{
   if(typeof JSZip==='undefined'){toast('Biblioteca de exportação ainda carregando, tente novamente');return;}
   toast('Gerando setorização simulada...');
   await new Promise(r=>setTimeout(r,30));
-  const nB=S.bricks.length,nM=S.nM;
-  // agregados por brick x linha: meses + TRI25/YTD25/MAT25, respeitando linha simulada e marcas excluidas
-  const mos=new Float64Array(nB*2*nM),his=new Float64Array(nB*2*3);
-  const stride=nM+3;
-  for(let i=0;i<S.nCombos;i++){
-    const m=S.mArr[i];
-    if(S.marcaOff.has(m))continue;
-    const L=linhaOf(m),b=S.bArr[i],o=i*stride,q=(b*2+L);
-    for(let k=0;k<nM;k++)mos[q*nM+k]+=S.vArr[o+k];
-    for(let h=0;h<3;h++)his[q*3+h]+=S.vArr[o+nM+h];
+  const bs=computeBrickSums('mes');
+  const st=computeSectorTotals(bs);
+  const pend=pendingBricks();
+  const pendByOrig=[new Map(),new Map()];
+  for(let L=0;L<2;L++)for(const r of pend[L])pendByOrig[L].set(r.orig,(pendByOrig[L].get(r.orig)||0)+1);
+  const head=['SETOR ESPELHO','REGIONAL','SETOR ANTIGO','SETOR NOVO','PLACA','VEÍCULO','NOME','Observação','DATA ADMISSÃO','LINHA ATUAL','STATUS','DDD','TELEFONE','NOVA SEDE'];
+  const nC=head.length;
+  // estilos: 0 normal,1 header(azul/amarelo),2 GR(azul escuro/branco),3 banda GD(cinza,negrito),4 alterado(violeta),5 pendente(vermelho claro)
+  let rowsXml='',rn=1;
+  const row=(vals,style)=>{
+    let cells='';
+    for(let c=0;c<nC;c++){
+      const v=vals[c];
+      if(v==null||v===''){cells+=`<c r="${colRef(c)}${rn}" s="${style}"/>`;continue;}
+      cells+=`<c r="${colRef(c)}${rn}" t="inlineStr" s="${style}"><is><t>${xesc(v)}</t></is></c>`;
+    }
+    rowsXml+=`<row r="${rn}">${cells}</row>`;rn++;
+  };
+  row(head,1);
+  const gr=S.study&&S.study.gr;
+  if(gr)row([gr.espelho,gr.regional,gr.antigo,gr.num,gr.placa,gr.veiculo,gr.nome,gr.obs,admStr(gr.adm),gr.linhaTxt,gr.statusTxt,gr.ddd,gr.tel,gr.sede],2);
+  for(const team of S.teams){
+    const band=Array(nC).fill('');band[6]=team.name;
+    row(band,3);
+    for(const i of team.sIdxs){
+      const sx=S.setores[i];
+      const d=S.studyByNum?S.studyByNum.get(sx.num):null;
+      const obsParts=[];
+      if(d&&d.obs)obsParts.push(d.obs);
+      if(S.teamOv.has(i))obsParts.push('MOVIDO DE '+(sx.teamOrig||''));
+      if(S.linhaOv.has(i))obsParts.push('CONVERTIDO DE '+LNAME[sx.linha]+' PARA '+LNAME[efLinha(i)]);
+      const t=st[i];
+      if(t.recv)obsParts.push('+'+t.recv+' bricks recebidos');
+      if(t.lost)obsParts.push('-'+t.lost+' bricks cedidos');
+      const nConf=S.linhaOv.has(i)?sectorConflicts(i).length:0;
+      if(nConf)obsParts.push(nConf+' bricks em conflito');
+      if(sx.semVendas)obsParts.push('sem vendas na base');
+      const changed=S.teamOv.has(i)||S.linhaOv.has(i)||t.recv||t.lost;
+      row([d?d.espelho:'',d?d.regional:'',d?d.antigo:'',sx.num,d?d.placa:'',d?d.veiculo:'',
+        sx.nomeEstudo||sx.nome,obsParts.join(' | '),d?admStr(d.adm):'',
+        LNAME[efLinha(i)],d?d.statusTxt:'',d?d.ddd:'',d?d.tel:'',d?d.sede:''],changed?4:0);
+    }
+    row(Array(nC).fill(''),0);
   }
-  const pdY=periodDef('ytd'),pdT=periodDef('tri'),pdM=periodDef('mat');
-  // linhas da planilha
-  const recs=[];
-  for(let L=0;L<2;L++){
-    for(let b=0;b<nB;b++){
-      const sIdx=sectorOf(b,L);
-      if(sIdx<0||sIdx===undefined)continue;
-      const q=b*2+L;
-      let any=false;
-      for(let k=0;k<nM;k++)if(mos[q*nM+k]!==0){any=true;break;}
-      if(!any){for(let h=0;h<3;h++)if(his[q*3+h]!==0){any=true;break;}}
-      if(!any)continue;
-      const s=S.setores[sIdx];
-      const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
-      const moved=S.brickOv.has(b+'|'+L);
-      const pend=!!s.extinto||efLinha(sIdx)!==L;
-      let alt='';
-      if(pend)alt='A REALOCAR (era '+s.num+' - '+s.nome+')';
-      else if(moved)alt=orig>=0?'REALOCADO DE '+S.setores[orig].num+' - '+(S.setores[orig].nomeEstudo||S.setores[orig].nome):'NOVO NO SETOR';
-      recs.push({L,b,q,sIdx,pend,moved,alt,
-        setor:pend?'A REALOCAR':(s.num+' - '+(s.nomeEstudo||s.nome))});
+  // setores desligados com bricks pendentes
+  const pendRows=[];
+  S.setores.forEach((sx,i)=>{
+    if(!sx.extinto)return;
+    const L=sx.linha;
+    const n=pendByOrig[L].get(i)||0;
+    if(n)pendRows.push([i,n]);
+  });
+  if(pendRows.length){
+    const band=Array(nC).fill('');band[6]='SETORES DESLIGADOS - BRICKS A REALOCAR';
+    row(band,3);
+    for(const[i,n]of pendRows){
+      const sx=S.setores[i];
+      row(['','','',sx.num,'','',sx.nome,n+' bricks pendentes de realocação na linha '+LNAME[sx.linha],'',LNAME[sx.linha],'','','',''],5);
     }
   }
-  recs.sort((a,b)=>a.L-b.L||a.setor.localeCompare(b.setor)||S.bricks[a.b].city.localeCompare(S.bricks[b.b].city)||S.bricks[a.b].name.localeCompare(S.bricks[b.b].name));
-  // estilos: 0 padrao,1 header,2 num,3 pct | movidos: 4 txt,5 num,6 pct | a realocar: 7 txt,8 num,9 pct
-  const evo=(c,r)=>r>0.005?(c/r-1):null;
-  const sum=(q,idxs)=>{let t=0;for(const k of idxs)t+=mos[q*nM+k];return t;};
-  const head=['LINHA','SETOR','CIDADE','BRICK','ALTERAÇÃO',...S.months,'Evo. Mês','Evo. Mês Ano Ant.','TRI 25','TRI 26','Evo. TRI','YTD 25','YTD 26','Evo. YTD','MAT 25','MAT 26','Evo. MAT'];
-  let rowsXml='<row r="1">'+head.map((h,c)=>`<c r="${colRef(c)}1" t="inlineStr" s="1"><is><t>${xesc(h)}</t></is></c>`).join('')+'</row>';
-  let rn=2;
-  for(const r of recs){
-    const bi=S.bricks[r.b];
-    const base=r.pend?7:(r.moved?4:0);
-    const sN=base===0?0:base, sV=base===0?2:base+1, sP=base===0?3:base+2;
-    const q=r.q;
-    const mLast=mos[q*nM+nM-1],mPrev=nM>1?mos[q*nM+nM-2]:0,mAno=nM>=13?mos[q*nM+nM-13]:0;
-    const tri26=sum(q,pdT.cur),ytd26=sum(q,pdY.cur),mat26=sum(q,pdM.cur);
-    const tri25=his[q*3+0],ytd25=his[q*3+1],mat25=his[q*3+2];
-    const cells=[];
-    const txts=[LNAME[r.L],r.setor,bi.city,bi.name,r.alt];
-    txts.forEach((t,c)=>cells.push(`<c r="${colRef(c)}${rn}" t="inlineStr" s="${sN}"><is><t>${xesc(t)}</t></is></c>`));
-    let c=5;
-    const num=v=>{cells.push(`<c r="${colRef(c)}${rn}" s="${sV}"><v>${v.toFixed(2)}</v></c>`);c++;};
-    const pct=v=>{if(v===null)cells.push(`<c r="${colRef(c)}${rn}" s="${sN}"/>`);else cells.push(`<c r="${colRef(c)}${rn}" s="${sP}"><v>${v.toFixed(6)}</v></c>`);c++;};
-    for(let k=0;k<nM;k++)num(mos[q*nM+k]);
-    pct(evo(mLast,mPrev));pct(evo(mLast,mAno));
-    num(tri25);num(tri26);pct(evo(tri26,tri25));
-    num(ytd25);num(ytd26);pct(evo(ytd26,ytd25));
-    num(mat25);num(mat26);pct(evo(mat26,mat25));
-    rowsXml+=`<row r="${rn}">${cells.join('')}</row>`;
-    rn++;
-  }
-  const lastCol=colRef(head.length-1);
-  const cols=`<cols><col min="1" max="1" width="10" customWidth="1"/><col min="2" max="2" width="34" customWidth="1"/><col min="3" max="3" width="24" customWidth="1"/><col min="4" max="4" width="40" customWidth="1"/><col min="5" max="5" width="38" customWidth="1"/><col min="6" max="${head.length}" width="12.5" customWidth="1"/></cols>`;
+  const cols=`<cols><col min="1" max="1" width="13" customWidth="1"/><col min="2" max="2" width="9" customWidth="1"/><col min="3" max="3" width="12" customWidth="1"/><col min="4" max="4" width="11" customWidth="1"/><col min="5" max="5" width="10" customWidth="1"/><col min="6" max="6" width="24" customWidth="1"/><col min="7" max="7" width="34" customWidth="1"/><col min="8" max="8" width="44" customWidth="1"/><col min="9" max="9" width="14" customWidth="1"/><col min="10" max="10" width="15" customWidth="1"/><col min="11" max="11" width="8" customWidth="1"/><col min="12" max="12" width="6" customWidth="1"/><col min="13" max="13" width="12" customWidth="1"/><col min="14" max="14" width="60" customWidth="1"/></cols>`;
   const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14.5"/>${cols}<sheetData>${rowsXml}</sheetData><autoFilter ref="A1:${lastCol}1"/></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14.5"/>${cols}<sheetData>${rowsXml}</sheetData><autoFilter ref="A1:${colRef(nC-1)}1"/></worksheet>`;
   const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.00"/><numFmt numFmtId="165" formatCode="0.0%"/></numFmts>
-<fonts count="2"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>
-<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF26323C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE9E2F7"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF9E3E3"/></patternFill></fill></fills>
+<fonts count="4"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFF00"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="10"/><name val="Calibri"/></font></fonts>
+<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F63B8"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F3864"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDDDDDD"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE9E2F7"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF9E3E3"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="10">
+<cellXfs count="6">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/>
-<xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/>
-<xf numFmtId="165" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/>
-<xf numFmtId="0" fontId="0" fillId="3" borderId="0" applyFill="1"/>
-<xf numFmtId="164" fontId="0" fillId="3" borderId="0" applyNumberFormat="1" applyFill="1"/>
-<xf numFmtId="165" fontId="0" fillId="3" borderId="0" applyNumberFormat="1" applyFill="1"/>
-<xf numFmtId="0" fontId="0" fillId="4" borderId="0" applyFill="1"/>
-<xf numFmtId="164" fontId="0" fillId="4" borderId="0" applyNumberFormat="1" applyFill="1"/>
-<xf numFmtId="165" fontId="0" fillId="4" borderId="0" applyNumberFormat="1" applyFill="1"/>
+<xf numFmtId="0" fontId="2" fillId="3" borderId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="0" fontId="3" fillId="4" borderId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="5" borderId="0" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="6" borderId="0" applyFill="1"/>
 </cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   const zip=new JSZip();
   zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
@@ -1549,81 +1688,7 @@ $('btnExportSet').onclick=async()=>{
   a.download='SETORIZACAO_SIMULADA_AGO26.xlsx';
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  toast('Setorização simulada exportada ('+(rn-2)+' linhas)');
-};
-function colRef(c){let s='';c++;while(c>0){const m=(c-1)%26;s=String.fromCharCode(65+m)+s;c=Math.floor((c-1)/26);}return s;}
-
-/* ---------- export ---------- */
-$('btnExport').onclick=()=>{
-  const periods=['mes','tri','ytd','mat'];
-  const sums={},defs={};
-  for(const p of periods){const r=computeBrickSums(p);sums[p]=r;defs[p]=r.pd;}
-  const stByP={};
-  for(const p of periods)stByP[p]=computeSectorTotals(sums[p]);
-  const evoNum=(c,r)=>r>0.005?(c/r-1):(c>0.005?null:0);
-
-  // aba 1: resumo por setor
-  const head1=['EQUIPE','SETOR','NOME','LINHA','BRICKS',
-    'MES '+S.months[S.nM-1],'TRI 26','TRI 25','EVO TRI','YTD 26','YTD 25','EVO YTD','MAT 26','MAT 25','EVO MAT'];
-  const aoa1=[head1];
-  for(const team of S.teams){
-    for(const i of team.sIdxs){
-      const s=S.setores[i];
-      aoa1.push([team.name,s.num,s.nomeEstudo||s.nome,LNAME[efLinha(i)],stByP.mes[i].nb,
-        +stByP.mes[i].cur.toFixed(2),
-        +stByP.tri[i].cur.toFixed(2),+stByP.tri[i].ref.toFixed(2),evoNum(stByP.tri[i].cur,stByP.tri[i].ref),
-        +stByP.ytd[i].cur.toFixed(2),+stByP.ytd[i].ref.toFixed(2),evoNum(stByP.ytd[i].cur,stByP.ytd[i].ref),
-        +stByP.mat[i].cur.toFixed(2),+stByP.mat[i].ref.toFixed(2),evoNum(stByP.mat[i].cur,stByP.mat[i].ref)]);
-    }
-  }
-  // aba 2: bricks
-  const teamOfSector=new Map();
-  for(const team of S.teams)for(const i of team.sIdxs)teamOfSector.set(i,team.name);
-  const aoa2=[['LINHA','EQUIPE','SETOR','NOME','SETOR ORIGINAL','BRICK','CIDADE',
-    'MES '+S.months[S.nM-1],'TRI 26','YTD 26','MAT 26']];
-  for(let b=0;b<S.bricks.length;b++){
-    for(let L=0;L<2;L++){
-      const sIdx=sectorOf(b,L);
-      if(sIdx<0||sIdx===undefined)continue;
-      const s=S.setores[sIdx];
-      const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
-      const moved=S.brickOv.has(b+'|'+L);
-      const pend=!!s.extinto||efLinha(sIdx)!==L;
-      aoa2.push([LNAME[L],pend?'A REALOCAR':(teamOfSector.get(sIdx)||''),pend?'':s.num,pend?'setor desligado: '+s.num+' - '+s.nome:(s.nomeEstudo||s.nome),
-        pend?s.num:(moved&&orig>=0?S.setores[orig].num:''),
-        S.bricks[b].name,S.bricks[b].city,
-        +sums.mes.cur[b*2+L].toFixed(2),+sums.tri.cur[b*2+L].toFixed(2),
-        +sums.ytd.cur[b*2+L].toFixed(2),+sums.mat.cur[b*2+L].toFixed(2)]);
-    }
-  }
-  // aba 3: marcas
-  const stride=S.nM+3;
-  const mAgg=S.marcas.map(()=>({mes:0,tri:0,ytd:0,mat:0}));
-  for(let i=0;i<S.nCombos;i++){
-    const m=S.mArr[i],o=i*stride,a=mAgg[m];
-    for(const p of periods){
-      let c=0;for(const ix of defs[p].cur)c+=S.vArr[o+ix];
-      a[p]+=c;
-    }
-  }
-  const aoa3=[['MARCA','STATUS','LINHA ORIGINAL','LINHA SIMULADA','MES '+S.months[S.nM-1],'TRI 26','YTD 26','MAT 26']];
-  const orderM=S.marcas.map((_,i)=>i).sort((a,b)=>mAgg[b].mat-mAgg[a].mat);
-  for(const m of orderM){
-    aoa3.push([S.marcas[m].name,S.marcaOff.has(m)?'EXCLUÍDA':'ATIVA',LNAME[S.marcas[m].linha],LNAME[linhaOf(m)],
-      +mAgg[m].mes.toFixed(2),+mAgg[m].tri.toFixed(2),+mAgg[m].ytd.toFixed(2),+mAgg[m].mat.toFixed(2)]);
-  }
-  const wb=XLSX.utils.book_new();
-  const ws1=XLSX.utils.aoa_to_sheet(aoa1);
-  const ws2=XLSX.utils.aoa_to_sheet(aoa2);
-  const ws3=XLSX.utils.aoa_to_sheet(aoa3);
-  ws1['!cols']=[{wch:16},{wch:8},{wch:34},{wch:10},{wch:7},{wch:13},{wch:13},{wch:13},{wch:9},{wch:13},{wch:13},{wch:9},{wch:13},{wch:13},{wch:9}];
-  ws2['!cols']=[{wch:9},{wch:16},{wch:8},{wch:32},{wch:12},{wch:44},{wch:26},{wch:13},{wch:13},{wch:13},{wch:13}];
-  ws3['!cols']=[{wch:24},{wch:10},{wch:14},{wch:14},{wch:13},{wch:13},{wch:13},{wch:13}];
-  XLSX.utils.book_append_sheet(wb,ws1,'RESUMO SETORES');
-  XLSX.utils.book_append_sheet(wb,ws2,'BRICKS');
-  XLSX.utils.book_append_sheet(wb,ws3,'MARCAS');
-  XLSX.writeFile(wb,'SIMULACAO_SETORIZACAO_AGO26.xlsx');
-  toast('Excel exportado com resumo, bricks e marcas');
+  toast('Setorização simulada exportada');
 };
 </script>
 </body>
