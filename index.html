@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Setorização AGO/26</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e6eaed; --panel:#f2f4f6; --panel2:#e9edf0; --border:#d5dce1; --border2:#c0cad1;
+  --txt:#26323c; --mut:#5b6b76; --mut2:#85939d;
+  --prime:#c97a1c; --prime-dim:#f4e8d4; --inf:#1d7fb4; --inf-dim:#ddebf3;
+  --pos:#118a61; --neg:#c74848; --alt:#7350c2; --alt-dim:#e9e2f7;
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--txt);font-family:'Inter',system-ui,sans-serif;font-size:14px}
+h1,h2,h3,.hfont{font-family:'Archivo',system-ui,sans-serif}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit}
+.num{font-variant-numeric:tabular-nums}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- upload screen ---------- */
+#uploadScreen{max-width:860px;margin:0 auto;padding:48px 24px}
+#uploadScreen .brand{letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-size:11px;font-weight:600;margin-bottom:10px}
+#uploadScreen h1{font-size:30px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+#uploadScreen .sub{color:var(--mut);margin-bottom:34px;max-width:620px;line-height:1.55}
+.upgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+@media(max-width:720px){.upgrid{grid-template-columns:1fr}}
+.upcard{background:var(--panel);border:1px dashed var(--border2);border-radius:var(--radius);padding:22px;cursor:pointer;transition:border-color .15s, background .15s}
+.upcard:hover{border-color:var(--mut2)}
+.upcard.ok{border-style:solid;border-color:var(--pos)}
+.upcard .step{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut2);font-weight:600;margin-bottom:8px}
+.upcard h3{font-size:15px;font-weight:700;margin-bottom:6px}
+.upcard p{color:var(--mut);font-size:12.5px;line-height:1.5}
+.upcard .fname{margin-top:12px;font-size:12px;color:var(--pos);word-break:break-all;display:none}
+.upcard.ok .fname{display:block}
+#btnProcess{background:var(--txt);color:#fff;border:0;border-radius:8px;padding:12px 26px;font-weight:700;font-size:14px}
+#btnProcess:disabled{background:var(--border2);color:var(--mut2);cursor:not-allowed}
+#progWrap{display:none;margin-top:26px}
+#progBar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+#progFill{height:100%;width:0;background:linear-gradient(90deg,var(--inf),var(--prime));transition:width .2s}
+#progTxt{margin-top:10px;color:var(--mut);font-size:12.5px}
+#restoreNote{display:none;margin-top:18px;background:var(--alt-dim);border:1px solid var(--alt);border-radius:8px;padding:12px 14px;font-size:12.5px;color:var(--txt)}
+
+/* ---------- topbar ---------- */
+#app{display:none}
+#topbar{position:sticky;top:0;z-index:50;background:rgba(230,234,237,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+#topbar .ttl{font-family:'Archivo';font-weight:800;font-size:15px;letter-spacing:-.01em;white-space:nowrap}
+#topbar .ttl small{display:block;font-family:'Inter';font-weight:600;font-size:10px;letter-spacing:.14em;color:var(--mut2);text-transform:uppercase}
+.seg{display:flex;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--mut);padding:7px 14px;font-size:12.5px;font-weight:600}
+.seg button.on{background:var(--panel2);color:var(--txt)}
+#searchWrap{position:relative;flex:1;min-width:200px;max-width:380px}
+#searchInp{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--txt);padding:8px 12px;font-size:13px}
+#searchInp:focus{outline:none;border-color:var(--mut2)}
+#searchDrop{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;max-height:380px;overflow:auto;display:none;box-shadow:0 12px 40px rgba(20,35,45,.16)}
+.sr{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12.5px}
+.sr:last-child{border-bottom:0}
+.sr .bn{font-weight:600}
+.sr .ct{color:var(--mut);font-size:11.5px;margin:2px 0 6px}
+.sr .tg{display:inline-block;margin-right:6px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--panel)}
+.sr .tg:hover{border-color:var(--mut2)}
+.btn{background:var(--panel);border:1px solid var(--border2);border-radius:8px;color:var(--txt);padding:8px 14px;font-size:12.5px;font-weight:600}
+.btn:hover{border-color:var(--mut2)}
+.btn.primary{background:var(--txt);color:#fff;border-color:var(--txt)}
+.btn.danger:hover{border-color:var(--neg);color:var(--neg)}
+
+/* ---------- summary ---------- */
+#summary{padding:18px 20px 6px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-width:1500px;margin:0 auto}
+.sumcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.sumcard .lb{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut2);font-weight:600;margin-bottom:6px}
+.sumcard .vl{font-family:'Archivo';font-size:21px;font-weight:700}
+.sumcard .ev{font-size:12px;margin-top:3px}
+.sumcard.pl{border-left:3px solid var(--prime)}
+.sumcard.il{border-left:3px solid var(--inf)}
+#splitBarWrap{max-width:1500px;margin:8px auto 0;padding:0 20px}
+#splitBar{height:8px;border-radius:4px;overflow:hidden;display:flex;border:1px solid var(--border)}
+#splitP{background:var(--prime)}
+#splitI{background:var(--inf)}
+#splitLbl{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;margin-top:5px}
+.chgchip{display:inline-block;background:var(--alt-dim);border:1px solid var(--alt);color:var(--alt);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;margin-left:8px}
+
+/* ---------- tabs ---------- */
+#tabs{max-width:1500px;margin:16px auto 0;padding:0 20px;display:flex;gap:4px;border-bottom:1px solid var(--border)}
+#tabs button{background:transparent;border:0;color:var(--mut);padding:10px 18px;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+#tabs button.on{color:var(--txt);border-bottom-color:var(--txt)}
+
+/* ---------- teams ---------- */
+#teamsView,#marcasView{max-width:1500px;margin:0 auto;padding:16px 20px 60px}
+.teamband{margin-bottom:26px}
+.pendband{margin-bottom:30px;border:1px solid var(--alt);border-radius:var(--radius);overflow:hidden;background:var(--panel)}
+.pendhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;background:var(--alt-dim);padding:11px 16px;border-bottom:1px solid var(--alt)}
+.pendhead .tname{font-family:'Archivo';font-weight:800;font-size:14px;letter-spacing:.06em;color:var(--alt)}
+.pendgrp{border-bottom:1px solid var(--border)}
+.pendgrp:last-child{border-bottom:0}
+.pendgrp summary{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;list-style:none;font-size:12.5px}
+.pendgrp summary::-webkit-details-marker{display:none}
+.pendgrp summary:hover{background:var(--panel2)}
+.pendgrp summary i{width:8px;height:8px;border-radius:2px;flex:none}
+.pendgrp.lP summary i{background:var(--prime)}
+.pendgrp.lI summary i{background:var(--inf)}
+.pendgrp[open] summary{background:var(--panel2);border-bottom:1px solid var(--border)}
+.pendfoot{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel2);flex-wrap:wrap}
+.pendfoot .cnt{color:var(--mut);font-size:12px;margin-right:auto}
+.mirhint{padding:7px 16px;font-size:11.5px;color:var(--mut2);background:var(--panel);border-bottom:1px solid var(--border)}
+.stbl th.mircol{color:var(--mut2)}
+.stbl td.mircol{color:var(--mut2);font-size:11.5px;white-space:nowrap}
+.pendfoot select{background:var(--panel);border:1px solid var(--border2);border-radius:7px;color:var(--txt);padding:7px 10px;font-size:12.5px;max-width:320px}
+.sumcard.al{border-left:3px solid var(--alt)}
+.teamhead{display:flex;align-items:baseline;gap:14px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:12px;flex-wrap:wrap}
+.teamhead .tname{font-family:'Archivo';font-weight:800;font-size:15px;letter-spacing:.06em}
+.teamhead .ttot{font-family:'Archivo';font-weight:700;font-size:15px;margin-left:auto}
+.teamhead .tev{font-size:12px}
+.stbl{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.stbl thead th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut2);font-weight:600;padding:8px 12px;background:var(--panel2);border-bottom:1px solid var(--border)}
+.stbl thead th.r, .stbl td.r{text-align:right}
+.stbl tbody tr{cursor:pointer;border-bottom:1px solid var(--border)}
+.stbl tbody tr:last-child{border-bottom:0}
+.stbl tbody tr:hover{background:var(--panel2)}
+.stbl td{padding:7px 12px;font-size:12.5px;vertical-align:middle}
+.stbl td.snum{color:var(--mut);font-weight:600;white-space:nowrap;width:1%}
+.stbl td.snum i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;vertical-align:baseline}
+.stbl tr.lP td.snum i{background:var(--prime)}
+.stbl tr.lI td.snum i{background:var(--inf)}
+.stbl td.snome{font-weight:600}
+.stbl td.sval{font-family:'Archivo';font-weight:700;white-space:nowrap}
+.stbl td.sev,.stbl td.snb{white-space:nowrap;color:var(--mut)}
+.badge{display:inline-block;padding:1px 6px;border-radius:5px;font-size:9.5px;font-weight:700;letter-spacing:.04em;vertical-align:1px}
+.badge.bP{background:var(--prime-dim);color:var(--prime)}
+.badge.bI{background:var(--inf-dim);color:var(--inf)}
+.badge.bAlt{background:var(--alt-dim);color:var(--alt)}
+.badge.bZero{background:#f3dede;color:var(--neg)}
+.ev.pos{color:var(--pos)} .ev.neg{color:var(--neg)} .ev.neu{color:var(--mut)}
+
+/* ---------- marcas ---------- */
+#marcasView table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+#marcasView th{background:var(--panel2);text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);padding:10px 12px;font-weight:600}
+#marcasView td{padding:9px 12px;border-top:1px solid var(--border);font-size:13px}
+#marcasView tr:hover td{background:var(--panel2)}
+.ltoggle{display:inline-flex;border:1px solid var(--border2);border-radius:7px;overflow:hidden}
+.ltoggle button{border:0;background:transparent;color:var(--mut2);padding:4px 12px;font-size:11.5px;font-weight:700}
+.ltoggle button.onP{background:var(--prime-dim);color:var(--prime)}
+.ltoggle button.onI{background:var(--inf-dim);color:var(--inf)}
+tr.moff td{opacity:.55}
+tr.moff td .badge{opacity:1}
+.linkbtn.warn{color:var(--neg)}
+.td-r{text-align:right}
+#marcasView th.td-r{text-align:right}
+
+/* ---------- modal ---------- */
+.modalBg{position:fixed;inset:0;background:rgba(20,35,45,.45);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:34px 16px;overflow:auto}
+.modalBg.open{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:980px;box-shadow:0 30px 80px rgba(20,35,45,.25)}
+.mhead{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.mhead h2{font-size:18px;font-weight:800}
+.mhead .meta{color:var(--mut);font-size:12px;margin-top:4px;line-height:1.6}
+.mhead .mclose{margin-left:auto;background:transparent;border:0;color:var(--mut);font-size:22px;line-height:1;padding:4px 8px}
+.mhead .mclose:hover{color:var(--txt)}
+.mtabs{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--border)}
+.mtabs button{background:transparent;border:0;color:var(--mut);padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+.mtabs button.on{color:var(--txt);border-bottom-color:var(--txt)}
+.mbody{padding:16px 22px;max-height:56vh;overflow:auto}
+.mbody table{width:100%;border-collapse:collapse}
+.mbody th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut2);padding:6px 8px;font-weight:600;border-bottom:1px solid var(--border);position:sticky;top:-16px;background:var(--panel)}
+.mbody td{padding:7px 8px;border-bottom:1px solid var(--border);font-size:12.5px}
+.mbody tr:hover td{background:var(--panel2)}
+.mfoot{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mfoot select{background:var(--panel2);border:1px solid var(--border2);border-radius:8px;color:var(--txt);padding:8px 10px;font-size:12.5px;max-width:340px}
+.mfoot .cnt{color:var(--mut);font-size:12px}
+.linkbtn{background:transparent;border:0;color:var(--inf);font-size:11.5px;font-weight:600;padding:0}
+.linkbtn:hover{text-decoration:underline}
+.sedebox{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11.5px;color:var(--mut);line-height:1.6;margin-bottom:14px}
+.emptymsg{color:var(--mut2);font-size:13px;padding:20px 0;text-align:center}
+
+/* changes modal */
+#chgList{list-style:none}
+#chgList li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+#chgList li:last-child{border-bottom:0}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border2);border-radius:10px;padding:11px 20px;font-size:13px;z-index:200;box-shadow:0 10px 30px rgba(20,35,45,.18);display:none}
+</style>
+</head>
+<body>
+
+<!-- =============== UPLOAD =============== -->
+<div id="uploadScreen">
+  <div class="brand">Supera Farma, Regional Sul</div>
+  <h1>Simulador de Setorização AGO/26</h1>
+  <p class="sub">Carregue o estudo de setorização e a base de vendas por brick. O simulador monta as equipes conforme o estudo, calcula o faturamento de cada setor a partir dos bricks e permite mover bricks entre setores e marcas entre linhas, recalculando tudo na hora.</p>
+  <div class="upgrid">
+    <div class="upcard" id="cardEstudo">
+      <div class="step">Arquivo 1</div>
+      <h3>Estudo de setorização</h3>
+      <p>Planilha com a aba SETORIZAÇÃO ESTUDO AGOSTO: equipes (GD), setores, nomes e linhas.</p>
+      <div class="fname" id="fnEstudo"></div>
+      <input type="file" id="fileEstudo" accept=".xlsx" hidden>
+    </div>
+    <div class="upcard" id="cardBase">
+      <div class="step">Arquivo 2</div>
+      <h3>Base de vendas</h3>
+      <p>Planilha LINHA, SETOR, CIDADE, BRICK, PDV, MARCA com os meses de venda. Arquivos grandes são processados por streaming.</p>
+      <div class="fname" id="fnBase"></div>
+      <input type="file" id="fileBase" accept=".xlsx" hidden>
+    </div>
+  </div>
+  <button id="btnProcess" disabled>Processar arquivos</button>
+  <div id="progWrap">
+    <div id="progBar"><div id="progFill"></div></div>
+    <div id="progTxt">Preparando...</div>
+  </div>
+  <div id="restoreNote"></div>
+</div>
+
+<!-- =============== APP =============== -->
+<div id="app">
+  <div id="topbar">
+    <div class="ttl">SIMULADOR DE SETORIZAÇÃO<small>AGO/26, Regional Sul</small></div>
+    <div class="seg" id="periodSeg">
+      <button data-p="mes" class="on">Mês</button>
+      <button data-p="tri">TRI</button>
+      <button data-p="ytd">YTD</button>
+      <button data-p="mat">MAT</button>
+    </div>
+    <div id="searchWrap">
+      <input id="searchInp" placeholder="Buscar brick ou cidade..." autocomplete="off">
+      <div id="searchDrop"></div>
+    </div>
+    <button class="btn" id="btnChanges">Alterações</button>
+    <button class="btn" id="btnExportSet">Exportar setorização</button>
+    <button class="btn" id="btnExport">Exportar resumo</button>
+    <button class="btn danger" id="btnReset">Resetar</button>
+  </div>
+
+  <div id="summary"></div>
+  <div id="splitBarWrap">
+    <div id="splitBar"><div id="splitP"></div><div id="splitI"></div></div>
+    <div id="splitLbl"><span id="splitLp"></span><span id="splitLi"></span></div>
+  </div>
+
+  <div id="tabs">
+    <button data-t="teams" class="on">Setorização</button>
+    <button data-t="marcas">Marcas por linha</button>
+  </div>
+
+  <div id="teamsView"></div>
+  <div id="marcasView" style="display:none"></div>
+</div>
+
+<!-- =============== MODAIS =============== -->
+<div class="modalBg" id="sectorModalBg">
+  <div class="modal">
+    <div class="mhead">
+      <div>
+        <h2 id="smTitle"></h2>
+        <div class="meta" id="smMeta"></div>
+      </div>
+      <button class="mclose" id="smClose">&times;</button>
+    </div>
+    <div class="mtabs">
+      <button data-mt="bricks" class="on">Bricks</button>
+      <button data-mt="marcas">Marcas</button>
+      <button data-mt="saidas" id="smTabSaidas">Saíram (0)</button>
+    </div>
+    <div class="mbody" id="smBody"></div>
+    <div class="mfoot" id="smFoot"></div>
+  </div>
+</div>
+
+<div class="modalBg" id="changesModalBg">
+  <div class="modal" style="max-width:640px">
+    <div class="mhead">
+      <div><h2>Alterações da simulação</h2><div class="meta">Bricks movidos e marcas com troca de linha. As alterações ficam salvas no navegador.</div></div>
+      <button class="mclose" id="cmClose">&times;</button>
+    </div>
+    <div class="mbody"><ul id="chgList"></ul></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- =============== WORKER =============== -->
+<script id="workerSrc" type="text/plain">
+function zipEntries(u8){
+  let p=u8.length-22;
+  while(p>=0&&!(u8[p]===0x50&&u8[p+1]===0x4b&&u8[p+2]===0x05&&u8[p+3]===0x06))p--;
+  if(p<0)throw new Error('Arquivo ZIP invalido');
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  const count=dv.getUint16(p+10,true);
+  let off=dv.getUint32(p+16,true);
+  const entries=[];const td=new TextDecoder();
+  for(let i=0;i<count;i++){
+    const method=dv.getUint16(off+10,true);
+    const csize=dv.getUint32(off+20,true);
+    const usize=dv.getUint32(off+24,true);
+    const nlen=dv.getUint16(off+28,true);
+    const elen=dv.getUint16(off+30,true);
+    const clen=dv.getUint16(off+32,true);
+    const lho=dv.getUint32(off+42,true);
+    const name=td.decode(u8.subarray(off+46,off+46+nlen));
+    entries.push({name,method,csize,usize,lho});
+    off+=46+nlen+elen+clen;
+  }
+  return entries;
+}
+function entryData(u8,e){
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  const nlen=dv.getUint16(e.lho+26,true);
+  const elen=dv.getUint16(e.lho+28,true);
+  const start=e.lho+30+nlen+elen;
+  return u8.subarray(start,start+e.csize);
+}
+async function inflateAll(comp,method){
+  if(method===0)return comp;
+  const ds=new DecompressionStream('deflate-raw');
+  const chunks=[];
+  const wp=(async()=>{const w=ds.writable.getWriter();const CH=4*1024*1024;
+    for(let i=0;i<comp.length;i+=CH)await w.write(comp.subarray(i,i+CH));await w.close();})();
+  const r=ds.readable.getReader();
+  for(;;){const{done,value}=await r.read();if(done)break;chunks.push(value);}
+  await wp;
+  let n=0;for(const c of chunks)n+=c.length;
+  const out=new Uint8Array(n);let o=0;
+  for(const c of chunks){out.set(c,o);o+=c.length;}
+  return out;
+}
+async function inflateStream(comp,method,onChunk,onProg){
+  if(method===0){onChunk(comp);return;}
+  const ds=new DecompressionStream('deflate-raw');
+  let fed=0;
+  const wp=(async()=>{const w=ds.writable.getWriter();const CH=2*1024*1024;
+    for(let i=0;i<comp.length;i+=CH){await w.write(comp.subarray(i,i+CH));fed=Math.min(i+CH,comp.length);onProg&&onProg(fed/comp.length);}
+    await w.close();})();
+  const r=ds.readable.getReader();
+  for(;;){const{done,value}=await r.read();if(done)break;onChunk(value);}
+  await wp;
+}
+function decodeEnt(s){
+  if(s.indexOf('&')<0)return s;
+  return s.replace(/&(amp|lt|gt|quot|apos|#x?[0-9a-fA-F]+);/g,(m,g)=>{
+    if(g==='amp')return'&';if(g==='lt')return'<';if(g==='gt')return'>';
+    if(g==='quot')return'"';if(g==='apos')return"'";
+    return String.fromCodePoint(g[1]==='x'||g[1]==='X'?parseInt(g.slice(2),16):parseInt(g.slice(1),10));
+  });
+}
+function parseSST(xml){
+  const out=[];const reSi=/<si>([\s\S]*?)<\/si>/g;const reT=/<t[^>]*>([\s\S]*?)<\/t>/g;
+  let m;
+  while((m=reSi.exec(xml))){
+    let s='',t;reT.lastIndex=0;
+    while((t=reT.exec(m[1])))s+=t[1];
+    out.push(decodeEnt(s));
+  }
+  return out;
+}
+function colToIdx(letters){
+  let n=0;for(let i=0;i<letters.length;i++)n=n*26+(letters.charCodeAt(i)-64);
+  return n-1;
+}
+
+self.onmessage=async(ev)=>{
+  try{
+    const u8=new Uint8Array(ev.data.buffer);
+    const entries=zipEntries(u8);
+    const sstEntry=entries.find(e=>e.name==='xl/sharedStrings.xml');
+    const sheetCands=entries.filter(e=>/^xl\/worksheets\/sheet\d+\.xml$/.test(e.name));
+    if(!sheetCands.length)throw new Error('Nenhuma planilha encontrada no arquivo');
+    const sheetEntry=sheetCands.sort((a,b)=>b.usize-a.usize)[0];
+    postMessage({type:'status',msg:'Lendo textos compartilhados...'});
+    const sst=sstEntry?parseSST(new TextDecoder().decode(await inflateAll(entryData(u8,sstEntry),sstEntry.method))):[];
+    postMessage({type:'status',msg:'Processando linhas...'});
+
+    const decoder=new TextDecoder();
+    let buf='';
+    let header=null,colRole=null;
+    const months=[];const histNames={'TRI 25':0,'YTD 25':1,'MAT 25':2};
+    let nM=0;
+    const brickIds=new Map(),marcaIds=new Map(),setorIds=new Map();
+    const bricks=[],marcas=[],setores=[];
+    const agg=new Map();
+    let rowCount=0;
+    const reCell=/<c r="([A-Z]+)\d+"([^>]*)>(?:<v>([^<]*)<\/v>)?/g;
+
+    function parseRow(rowStr){
+      reCell.lastIndex=0;let m;
+      if(!header){
+        header=[];
+        while((m=reCell.exec(rowStr))){
+          if(m[3]===undefined)continue;
+          const idx=colToIdx(m[1]);
+          const raw=m[2].indexOf('t="s"')>=0?sst[+m[3]]:m[3];
+          header[idx]=String(raw).trim();
+        }
+        colRole=header.map(h=>{
+          if(!h)return null;
+          const H=h.toUpperCase();
+          if(H==='LINHA')return{t:'k',k:0};
+          if(H==='SETOR')return{t:'k',k:1};
+          if(H==='CIDADE')return{t:'k',k:2};
+          if(H==='BRICK')return{t:'k',k:3};
+          if(H==='MARCA')return{t:'k',k:4};
+          if(/^[a-z\u00e7]{3}\/\d{2}$/i.test(h)){months.push(h);return{t:'m',i:months.length-1};}
+          if(H in histNames)return{t:'h',i:histNames[H]};
+          return null;
+        });
+        nM=months.length;
+        if(nM===0)throw new Error('Nenhuma coluna de mes reconhecida no cabecalho');
+        const need=['LINHA','SETOR','BRICK','MARCA'];
+        for(const n of need)if(!header.some(h=>h&&h.toUpperCase()===n))throw new Error('Coluna obrigatoria ausente: '+n);
+        return;
+      }
+      let linha=null,setor=null,cidade=null,brick=null,marca=null,vals=null;
+      while((m=reCell.exec(rowStr))){
+        if(m[3]===undefined)continue;
+        const role=colRole[colToIdx(m[1])];
+        if(!role)continue;
+        if(role.t==='k'){
+          const s=m[2].indexOf('t="s"')>=0?sst[+m[3]]:m[3];
+          if(role.k===0)linha=s;else if(role.k===1)setor=s;else if(role.k===2)cidade=s;
+          else if(role.k===3)brick=s;else marca=s;
+        }else{
+          const v=+m[3];
+          if(v!==0&&!Number.isNaN(v)){
+            if(!vals)vals=new Float64Array(nM+3);
+            vals[role.t==='m'?role.i:nM+role.i]+=v;
+          }
+        }
+      }
+      if(!linha||!setor||!brick||!marca)return;
+      rowCount++;
+      const linTrim=linha.trim();
+      const L=linTrim==='PRIME'?0:1;
+      let sId=setorIds.get(setor);
+      if(sId===undefined){
+        sId=setores.length;setorIds.set(setor,sId);
+        const dash=setor.indexOf(' - ');
+        setores.push({code:setor,num:parseInt(setor,10)||0,nome:dash>=0?setor.slice(dash+3).trim():setor,linha:L});
+      }
+      let bId=brickIds.get(brick);
+      if(bId===undefined){
+        bId=bricks.length;brickIds.set(brick,bId);
+        bricks.push({name:brick,city:(cidade||'').trim(),sP:-1,sI:-1});
+      }
+      const bi=bricks[bId];
+      if(L===0){if(bi.sP<0)bi.sP=sId;}else{if(bi.sI<0)bi.sI=sId;}
+      let mId=marcaIds.get(marca);
+      if(mId===undefined){
+        mId=marcas.length;marcaIds.set(marca,mId);
+        marcas.push({name:marca,linha:L});
+      }
+      if(!vals)return;
+      const key=bId*4096+mId;
+      let arr=agg.get(key);
+      if(!arr){arr=new Float64Array(nM+3);agg.set(key,arr);}
+      for(let i=0;i<nM+3;i++)arr[i]+=vals[i];
+    }
+
+    let lastProg=0;
+    await inflateStream(entryData(u8,sheetEntry),sheetEntry.method,(chunk)=>{
+      buf+=decoder.decode(chunk,{stream:true});
+      const parts=buf.split('</row>');
+      buf=parts.pop();
+      for(const p of parts){
+        const i=p.lastIndexOf('<row');
+        if(i>=0)parseRow(p.slice(i));
+      }
+    },(pct)=>{
+      if(pct-lastProg>0.02){lastProg=pct;postMessage({type:'progress',pct,rows:rowCount});}
+    });
+
+    const n=agg.size;
+    const bArr=new Int32Array(n),mArr=new Int16Array(n),vArr=new Float64Array(n*(nM+3));
+    let i=0;
+    for(const[key,arr]of agg){
+      bArr[i]=Math.floor(key/4096);mArr[i]=key%4096;
+      vArr.set(arr,i*(nM+3));
+      i++;
+    }
+    postMessage({type:'done',months,nM,bricks,marcas,setores,rowCount,
+      bArr:bArr.buffer,mArr:mArr.buffer,vArr:vArr.buffer},
+      [bArr.buffer,mArr.buffer,vArr.buffer]);
+  }catch(err){
+    postMessage({type:'error',msg:err.message||String(err)});
+  }
+};
+</script>
+
+<!-- =============== APP JS =============== -->
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const LS_KEY='simulador_setorizacao_ago26';
+const LNAME=['PRIME','INFINITY'];
+const LKEY=['P','I'];
+
+const S={
+  months:[],nM:0,bricks:[],marcas:[],setores:[],
+  bArr:null,mArr:null,vArr:null,nCombos:0,
+  study:null,             // {teams:[{name, sectors:[{num,nome,linha,espelho,antigo,sede}]}]}
+  teams:[],               // display: [{name, sIdxs:[...]}]
+  studyByNum:new Map(),
+  brickOv:new Map(),      // 'bId|L' -> sIdx
+  marcaOv:new Map(),      // mId -> L
+  marcaOff:new Set(),     // mIds excluidas da simulacao
+  linhaOv:new Map(),      // sIdx -> linha simulada (setor convertido)
+  period:'mes',
+  filesEstudo:null,filesBase:null,
+};
+
+/* ---------- helpers ---------- */
+function normTxt(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();}
+function fmtBRL(n){return 'R$ '+Math.round(n).toLocaleString('pt-BR');}
+function fmtBRL2(n){return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function evoOf(cur,ref){
+  if(ref<=0.005)return cur>0.005?{txt:'novo',cls:'pos'}:{txt:'', cls:'neu'};
+  const p=(cur/ref-1)*100;
+  const cls=p>0.05?'pos':(p<-0.05?'neg':'neu');
+  return{txt:(p>0?'+':'')+p.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%',cls};
+}
+function evoHtml(cur,ref,extra){
+  const e=evoOf(cur,ref);
+  if(!e.txt)return'';
+  return `<span class="ev ${e.cls}">${e.txt}${extra?' '+extra:''}</span>`;
+}
+function toast(msg){
+  const t=$('toast');t.textContent=msg;t.style.display='block';
+  clearTimeout(t._to);t._to=setTimeout(()=>t.style.display='none',2600);
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ---------- upload wiring ---------- */
+$('cardEstudo').onclick=()=>$('fileEstudo').click();
+$('cardBase').onclick=()=>$('fileBase').click();
+$('fileEstudo').onchange=e=>{
+  if(!e.target.files.length)return;
+  S.filesEstudo=e.target.files[0];
+  $('fnEstudo').textContent=S.filesEstudo.name;
+  $('cardEstudo').classList.add('ok');
+  checkReady();
+};
+$('fileBase').onchange=e=>{
+  if(!e.target.files.length)return;
+  S.filesBase=e.target.files[0];
+  $('fnBase').textContent=S.filesBase.name;
+  $('cardBase').classList.add('ok');
+  checkReady();
+};
+function checkReady(){$('btnProcess').disabled=!S.filesBase;}
+try{
+  const saved=JSON.parse(localStorage.getItem(LS_KEY)||'null');
+  if(saved&&((saved.mb&&saved.mb.length)||(saved.mo&&saved.mo.length)||(saved.mx&&saved.mx.length)||(saved.sl&&saved.sl.length))){
+    $('restoreNote').style.display='block';
+    $('restoreNote').textContent='Existe uma simulação salva neste navegador ('+(saved.mb?saved.mb.length:0)+' bricks movidos, '+(saved.mo?saved.mo.length:0)+' marcas trocadas, '+(saved.mx?saved.mx.length:0)+' marcas excluídas). Ela será reaplicada após o processamento.';
+  }
+}catch(e){}
+
+$('btnProcess').onclick=async()=>{
+  $('btnProcess').disabled=true;
+  $('progWrap').style.display='block';
+  try{
+    if(S.filesEstudo){
+      setProg(2,'Lendo estudo de setorização...');
+      await parseEstudo(S.filesEstudo);
+    }
+    setProg(5,'Lendo base de vendas...');
+    const buffer=await S.filesBase.arrayBuffer();
+    await runWorker(buffer);
+    buildTeams();
+    applyDefaultOff();
+    applySaved();
+    $('uploadScreen').style.display='none';
+    $('app').style.display='block';
+    renderAll();
+  }catch(err){
+    setProg(0,'Erro: '+err.message);
+    $('btnProcess').disabled=false;
+    console.error(err);
+  }
+};
+function setProg(pct,txt){
+  $('progFill').style.width=pct+'%';
+  if(txt)$('progTxt').textContent=txt;
+}
+
+/* ---------- estudo parse ---------- */
+async function parseEstudo(file){
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  let name=wb.SheetNames.find(n=>normTxt(n).includes('ESTUDO'))||wb.SheetNames[0];
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:null});
+  // localizar linha de cabecalho e indices
+  let hIdx=-1,ci={};
+  for(let r=0;r<Math.min(rows.length,10);r++){
+    const cols=(rows[r]||[]).map(c=>normTxt(c));
+    if(cols.some(c=>c==='SETOR NOVO')){
+      hIdx=r;
+      cols.forEach((c,i)=>{
+        if(c==='SETOR ESPELHO')ci.esp=i;
+        else if(c==='SETOR ANTIGO')ci.ant=i;
+        else if(c==='SETOR NOVO')ci.novo=i;
+        else if(c==='NOME')ci.nome=i;
+        else if(c==='LINHA ATUAL')ci.linha=i;
+        else if(c==='STATUS')ci.status=i;
+        else if(c==='NOVA SEDE')ci.sede=i;
+      });
+      break;
+    }
+  }
+  if(hIdx<0)throw new Error('Aba do estudo sem coluna SETOR NOVO');
+  const teams=[];let cur=null;
+  for(let r=hIdx+1;r<rows.length;r++){
+    const row=rows[r]||[];
+    const nome=row[ci.nome];
+    const novo=row[ci.novo];
+    if(nome&&/^GD\s*\d+/i.test(String(nome).trim())&&(novo===null||novo==='')){
+      cur={name:String(nome).trim().toUpperCase(),sectors:[]};
+      teams.push(cur);
+      continue;
+    }
+    const num=parseInt(novo,10);
+    if(!num||!nome)continue;
+    const status=normTxt(row[ci.status]);
+    if(status==='GR')continue;
+    if(!cur){cur={name:'EQUIPE',sectors:[]};teams.push(cur);}
+    cur.sectors.push({
+      num,
+      nome:String(nome).replace(/\u00a0/g,' ').trim(),
+      linha:normTxt(row[ci.linha]).includes('PRIME')&&!normTxt(row[ci.linha]).includes('INFINITY')?0:(normTxt(row[ci.linha]).includes('INFINITY')?1:-1),
+      espelho:row[ci.esp]||'',
+      antigo:row[ci.ant]||'',
+      sede:ci.sede!==undefined?String(row[ci.sede]||'').trim():''
+    });
+  }
+  S.study={teams};
+  S.studyByNum=new Map();
+  teams.forEach(t=>t.sectors.forEach(s=>S.studyByNum.set(s.num,s)));
+}
+
+/* ---------- worker ---------- */
+function runWorker(buffer){
+  return new Promise((resolve,reject)=>{
+    const src=$('workerSrc').textContent;
+    const url=URL.createObjectURL(new Blob([src],{type:'application/javascript'}));
+    const w=new Worker(url);
+    w.onmessage=ev=>{
+      const d=ev.data;
+      if(d.type==='progress'){
+        setProg(5+d.pct*90,'Processando... '+d.rows.toLocaleString('pt-BR')+' linhas lidas');
+      }else if(d.type==='status'){
+        $('progTxt').textContent=d.msg;
+      }else if(d.type==='done'){
+        S.months=d.months;S.nM=d.nM;
+        S.bricks=d.bricks;S.marcas=d.marcas;S.setores=d.setores;
+        S.bArr=new Int32Array(d.bArr);S.mArr=new Int16Array(d.mArr);S.vArr=new Float64Array(d.vArr);
+        S.nCombos=S.bArr.length;
+        setProg(100,'Concluído: '+d.rowCount.toLocaleString('pt-BR')+' linhas, '+S.bricks.length+' bricks, '+S.marcas.length+' marcas, '+S.setores.length+' setores');
+        w.terminate();URL.revokeObjectURL(url);
+        resolve();
+      }else if(d.type==='error'){
+        w.terminate();URL.revokeObjectURL(url);
+        reject(new Error(d.msg));
+      }
+    };
+    w.onerror=e=>{w.terminate();reject(new Error(e.message||'Falha no processamento'));};
+    w.postMessage({buffer},[buffer]);
+  });
+}
+
+/* ---------- teams display structure ---------- */
+function buildTeams(){
+  const byNum=new Map();
+  S.setores.forEach((s,i)=>byNum.set(s.num,i));
+  const used=new Set();
+  S.teams=[];
+  if(S.study){
+    for(const t of S.study.teams){
+      const team={name:t.name,sIdxs:[]};
+      for(const st of t.sectors){
+        const idx=byNum.get(st.num);
+        if(idx!==undefined){
+          team.sIdxs.push(idx);used.add(idx);
+          // preferir nome do estudo (com acentos) e guardar metadados
+          S.setores[idx].nomeEstudo=st.nome;
+          S.setores[idx].sede=st.sede;
+          S.setores[idx].espelho=st.espelho;
+          S.setores[idx].antigo=st.antigo;
+        }else{
+          // setor do estudo sem vendas na base
+          const nIdx=S.setores.length;
+          S.setores.push({code:st.num+' - '+st.nome,num:st.num,nome:st.nome,nomeEstudo:st.nome,
+            linha:st.linha>=0?st.linha:0,sede:st.sede,espelho:st.espelho,antigo:st.antigo,semVendas:true});
+          team.sIdxs.push(nIdx);used.add(nIdx);
+        }
+      }
+      if(team.sIdxs.length)S.teams.push(team);
+    }
+  }
+  const rest=[];
+  S.setores.forEach((s,i)=>{s.extinto=false;if(!used.has(i))rest.push(i);});
+  rest.sort((a,b)=>S.setores[a].num-S.setores[b].num);
+  S.extintos=[];
+  if(rest.length){
+    if(S.study){
+      // setores desligados na reestruturacao: os bricks deles entram como "a realocar"
+      for(const i of rest){S.setores[i].extinto=true;S.extintos.push(i);}
+    }else{
+      S.teams.push({name:'TODOS OS SETORES',sIdxs:rest});
+    }
+  }
+}
+// bricks cujo setor atual e um setor desligado (por linha)
+function pendingBricks(){
+  const out=[[],[]];
+  if((!S.extintos||!S.extintos.length)&&!S.linhaOv.size)return out;
+  for(let b=0;b<S.bricks.length;b++){
+    for(let L=0;L<2;L++){
+      const s=sectorOf(b,L);
+      if(s>=0&&S.setores[s]&&(S.setores[s].extinto||efLinha(s)!==L))out[L].push({b,orig:s});
+    }
+  }
+  return out;
+}
+
+/* ---------- period math ---------- */
+function periodDef(p){
+  const nM=S.nM,last=nM-1;
+  const yy=S.months[last].slice(-2);
+  if(p==='mes'){
+    const refIdx=nM>=13?last-12:(last>0?last-1:-1);
+    return{cur:[last],refIdxs:refIdx>=0?[refIdx]:[],hist:-1,
+      lbl:S.months[last],refLbl:refIdx>=0?'vs '+S.months[refIdx]:''};
+  }
+  if(p==='tri'){
+    const cur=[];for(let i=Math.max(0,nM-3);i<nM;i++)cur.push(i);
+    return{cur,refIdxs:[],hist:0,lbl:'TRI '+yy,refLbl:'vs TRI 25'};
+  }
+  if(p==='ytd'){
+    const cur=[];for(let i=0;i<nM;i++)if(S.months[i].slice(-2)===yy)cur.push(i);
+    return{cur,refIdxs:[],hist:1,lbl:'YTD '+yy,refLbl:'vs YTD 25'};
+  }
+  const cur=[];for(let i=Math.max(0,nM-12);i<nM;i++)cur.push(i);
+  return{cur,refIdxs:[],hist:2,lbl:'MAT '+yy,refLbl:'vs MAT 25'};
+}
+function linhaOf(mId){return S.marcaOv.has(mId)?S.marcaOv.get(mId):S.marcas[mId].linha;}
+function efLinha(sIdx){return S.linhaOv.has(sIdx)?S.linhaOv.get(sIdx):S.setores[sIdx].linha;}
+function sectorOf(bId,L){
+  const k=bId+'|'+L;
+  if(S.brickOv.has(k))return S.brickOv.get(k);
+  return L===0?S.bricks[bId].sP:S.bricks[bId].sI;
+}
+// soma por brick e linha -> {cur,ref} Float64Array(nBricks*2)
+function computeBrickSums(p){
+  const pd=periodDef(p);
+  const stride=S.nM+3;
+  const nB=S.bricks.length;
+  const cur=new Float64Array(nB*2),ref=new Float64Array(nB*2);
+  const bA=S.bArr,mA=S.mArr,vA=S.vArr;
+  for(let i=0;i<S.nCombos;i++){
+    if(S.marcaOff.has(mA[i]))continue;
+    const L=linhaOf(mA[i]);
+    const o=i*stride,slot=bA[i]*2+L;
+    let c=0;
+    for(const ix of pd.cur)c+=vA[o+ix];
+    cur[slot]+=c;
+    if(pd.hist>=0)ref[slot]+=vA[o+S.nM+pd.hist];
+    else for(const ix of pd.refIdxs)ref[slot]+=vA[o+ix];
+  }
+  return{cur,ref,pd};
+}
+function computeSectorTotals(bs){
+  const res=S.setores.map(()=>({cur:0,ref:0,nb:0,recv:0,lost:0}));
+  const nB=S.bricks.length;
+  for(let b=0;b<nB;b++){
+    for(let L=0;L<2;L++){
+      const s=sectorOf(b,L);
+      if(s<0||s===undefined)continue;
+      if(S.setores[s].extinto||efLinha(s)!==L)continue; // pendente de realocacao: nao credita a nenhum setor
+      res[s].cur+=bs.cur[b*2+L];
+      res[s].ref+=bs.ref[b*2+L];
+      const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+      if(orig>=0||S.brickOv.has(b+'|'+L))res[s].nb++;
+      if(S.brickOv.has(b+'|'+L)){
+        res[s].recv++;
+        if(orig>=0)res[orig].lost++;
+      }
+    }
+  }
+  return res;
+}
+
+/* ---------- render ---------- */
+let cache={bs:null,st:null,pend:null};
+function recompute(){
+  cache.bs=computeBrickSums(S.period);
+  cache.st=computeSectorTotals(cache.bs);
+  if(S.period!=='ytd'){
+    cache.bsY=computeBrickSums('ytd');
+    cache.stY=computeSectorTotals(cache.bsY);
+  }else{cache.bsY=null;cache.stY=null;}
+  cache.pend=pendingBricks();
+}
+function renderAll(){
+  recompute();
+  renderSummary();
+  renderTeams();
+  renderMarcas();
+  saveLS();
+}
+function renderSummary(){
+  const st=cache.st,pd=cache.bs.pd;
+  let tp=0,ti=0,rp=0,ri=0;
+  const nB=S.bricks.length;
+  for(let b=0;b<nB;b++){
+    tp+=cache.bs.cur[b*2];ti+=cache.bs.cur[b*2+1];
+    rp+=cache.bs.ref[b*2];ri+=cache.bs.ref[b*2+1];
+  }
+  const tot=tp+ti,rtot=rp+ri;
+  const nChg=S.brickOv.size+S.marcaOv.size+S.marcaOff.size+S.linhaOv.size;
+  const nPend=cache.pend[0].length+cache.pend[1].length;
+  let pendVal=0;
+  for(let L=0;L<2;L++)for(const r of cache.pend[L])pendVal+=cache.bs.cur[r.b*2+L];
+  $('summary').innerHTML=`
+    <div class="sumcard"><div class="lb">Total geral, ${esc(pd.lbl)}${nChg?'<span class="chgchip" onclick="openChanges()">'+nChg+' alterações</span>':''}</div>
+      <div class="vl num">${fmtBRL(tot)}</div><div>${evoHtml(tot,rtot,pd.refLbl)}</div></div>
+    <div class="sumcard pl"><div class="lb">Linha PRIME</div>
+      <div class="vl num">${fmtBRL(tp)}</div><div>${evoHtml(tp,rp,pd.refLbl)}</div></div>
+    <div class="sumcard il"><div class="lb">Linha INFINITY</div>
+      <div class="vl num">${fmtBRL(ti)}</div><div>${evoHtml(ti,ri,pd.refLbl)}</div></div>
+    ${nPend?`<div class="sumcard al" style="cursor:pointer" onclick="goPending()"><div class="lb">A realocar</div>
+      <div class="vl num">${fmtBRL(pendVal)}</div><div class="ev" style="color:var(--alt)">${nPend} bricks sem setor na linha</div></div>`:''}
+    <div class="sumcard"><div class="lb">Estrutura</div>
+      <div class="vl num" style="font-size:16px;line-height:1.5">${S.setores.filter(s=>!s.semVendas&&!s.extinto).length} setores, ${S.bricks.length} bricks<br>${S.marcas.length-S.marcaOff.size} marcas${S.marcaOff.size?' ('+S.marcaOff.size+' excluídas)':''}</div></div>`;
+  const pp=tot>0?tp/tot*100:50;
+  $('splitP').style.width=pp+'%';
+  $('splitI').style.width=(100-pp)+'%';
+  $('splitLp').textContent='PRIME '+pp.toFixed(1)+'%';
+  $('splitLi').textContent='INFINITY '+(100-pp).toFixed(1)+'%';
+}
+function destOptions(L,excludeIdx){
+  let opts='';
+  for(const team of S.teams){
+    let inner='';
+    for(const i of team.sIdxs){
+      if(i===excludeIdx)continue;
+      const s2=S.setores[i];
+      if(efLinha(i)!==L)continue;
+      inner+=`<option value="${i}">${s2.num} - ${esc(s2.nomeEstudo||s2.nome)}</option>`;
+    }
+    if(inner)opts+=`<optgroup label="${esc(team.name)}">${inner}</optgroup>`;
+  }
+  return opts;
+}
+let pendSel=new Set();
+let pendOpen=new Set();
+function pendOpenSet(k,on){if(on)pendOpen.add(k);else pendOpen.delete(k);}
+function renderPending(pd){
+  const pend=cache.pend;
+  if(!pend[0].length&&!pend[1].length){pendSel.clear();return '';}
+  // limpar selecao de bricks que ja sairam da lista
+  const valid=new Set();
+  for(let L=0;L<2;L++)for(const r of pend[L])valid.add(r.b+'|'+L);
+  for(const k of pendSel)if(!valid.has(k))pendSel.delete(k);
+  let html='<div class="pendband" id="pendBlock"><div class="pendhead"><span class="tname">BRICKS A REALOCAR</span><span style="color:var(--mut);font-size:11.5px">bricks sem setor na linha (setores desligados no estudo ou convertidos de linha): distribua entre os setores ativos da linha</span></div>';
+  for(let L=0;L<2;L++){
+    if(!pend[L].length)continue;
+    // agrupar por setor de origem
+    const groups=new Map();
+    for(const r of pend[L]){
+      if(!groups.has(r.orig))groups.set(r.orig,[]);
+      groups.get(r.orig).push(r.b);
+    }
+    for(const[o,bricks]of[...groups.entries()].sort((a,b)=>S.setores[a[0]].num-S.setores[b[0]].num)){
+      const s=S.setores[o];
+      let gt=0,gr=0;
+      const rows=bricks.map(b=>({b,cur:cache.bs.cur[b*2+L],ref:cache.bs.ref[b*2+L]})).sort((a,b)=>b.cur-a.cur);
+      for(const r of rows){gt+=r.cur;gr+=r.ref;}
+      const nSel=rows.filter(r=>pendSel.has(r.b+'|'+L)).length;
+      const gk=o+'_'+L;
+      // pista de vizinhanca: quem cobre cada brick na outra linha
+      const OL=L===0?1:0;
+      const mir=b=>{const sIdx=OL===0?S.bricks[b].sP:S.bricks[b].sI;return sIdx>=0?sIdx:-1;};
+      const mCnt=new Map();
+      for(const r of rows){const mi=mir(r.b);const k=mi>=0?mi:-1;mCnt.set(k,(mCnt.get(k)||0)+1);}
+      const mSum=[...mCnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3)
+        .map(([mi,c])=>(mi>=0?S.setores[mi].num+' '+esc((S.setores[mi].nomeEstudo||S.setores[mi].nome).split(' ')[0]):'sem cobertura')+' ('+c+')').join(', ');
+      html+=`<details class="pendgrp ${L===0?'lP':'lI'}" ${pendOpen.has(gk)?'open':''} ontoggle="pendOpenSet('${gk}',this.open)"><summary>
+        <i></i><span class="num" style="color:var(--mut);font-weight:600">${s.num}</span>
+        <span style="font-weight:600">${esc(s.nome)}</span>
+        <span class="badge ${L===0?'bP':'bI'}">${LNAME[L]}</span>
+        <span style="margin-left:auto;color:var(--mut);font-size:12px">${rows.length} bricks</span>
+        <span class="num" style="font-family:'Archivo';font-weight:700">${fmtBRL(gt)}</span>
+        <span style="font-size:11.5px">${evoHtml(gt,gr)}</span></summary>
+        <div class="mirhint">Geografia coberta na linha ${LNAME[OL]} por: ${mSum}</div>
+        <table class="stbl" style="border-radius:0;border-left:0;border-right:0"><thead><tr>
+          <th style="width:26px"><input type="checkbox" ${nSel===rows.length?'checked':''} onclick="event.stopPropagation()" onchange="togglePendGroup(${o},${L},this.checked)"></th>
+          <th>Brick</th><th>Cidade</th><th class="mircol">${LNAME[OL]}</th><th class="r">${esc(pd.lbl)}</th><th class="r">Evo</th></tr></thead><tbody>`;
+      for(const r of rows){
+        const bi=S.bricks[r.b];
+        const mi=mir(r.b);
+        html+=`<tr onclick="event.stopPropagation()">
+          <td><input type="checkbox" ${pendSel.has(r.b+'|'+L)?'checked':''} onchange="togglePendSel(${r.b},${L},this.checked)"></td>
+          <td style="font-weight:600">${esc(bi.name)}</td>
+          <td style="color:var(--mut)">${esc(bi.city)}</td>
+          <td class="mircol">${mi>=0?S.setores[mi].num+' '+esc((S.setores[mi].nomeEstudo||S.setores[mi].nome).split(' ')[0]):'-'}</td>
+          <td class="r num">${fmtBRL(r.cur)}</td>
+          <td class="r">${evoHtml(r.cur,r.ref)}</td></tr>`;
+      }
+      html+=`</tbody></table>
+        <div class="pendfoot">
+          <span class="cnt num"><span id="pcnt_${o}_${L}">${nSel}</span> de ${rows.length} selecionados</span>
+          <select id="pdest_${o}_${L}"><option value="">Mover para...</option>${destOptions(L,-1)}</select>
+          <button class="btn primary" onclick="movePendGroup(${o},${L},false)">Mover selecionados</button>
+          <button class="btn" onclick="movePendGroup(${o},${L},true)">Mover todos</button>
+        </div></details>`;
+    }
+  }
+  html+='</div>';
+  return html;
+}
+function togglePendSel(b,L,on){
+  const k=b+'|'+L;
+  if(on)pendSel.add(k);else pendSel.delete(k);
+  const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+  const c=$('pcnt_'+orig+'_'+L);
+  if(c){let n=0;for(const key of pendSel)if(key.endsWith('|'+L)){const bb=+key.split('|')[0];const oo=L===0?S.bricks[bb].sP:S.bricks[bb].sI;if(oo===orig)n++;}c.textContent=n;}
+}
+function togglePendGroup(o,L,on){
+  for(const r of cache.pend[L]){
+    if(r.orig!==o)continue;
+    const k=r.b+'|'+L;
+    if(on)pendSel.add(k);else pendSel.delete(k);
+  }
+  renderTeams();
+}
+function movePendGroup(o,L,all){
+  const sel=$('pdest_'+o+'_'+L);
+  if(!sel||!sel.value){toast('Escolha o setor de destino');return;}
+  const dest=+sel.value;
+  let n=0;
+  for(const r of cache.pend[L]){
+    if(r.orig!==o)continue;
+    const k=r.b+'|'+L;
+    if(!all&&!pendSel.has(k))continue;
+    S.brickOv.set(k,dest);
+    pendSel.delete(k);
+    n++;
+  }
+  if(!n){toast('Selecione ao menos um brick');return;}
+  renderAll();
+  toast(n+' brick'+(n>1?'s realocados':' realocado')+' para '+S.setores[dest].num+' - '+(S.setores[dest].nomeEstudo||S.setores[dest].nome));
+}
+function goPending(){
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='teams'));
+  $('teamsView').style.display='block';
+  $('marcasView').style.display='none';
+  const el=$('pendBlock');
+  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function renderTeams(){
+  const st=cache.st,pd=cache.bs.pd,stY=cache.stY;
+  let html=renderPending(pd);
+  for(const team of S.teams){
+    let tc=0,tr=0;
+    for(const i of team.sIdxs){tc+=st[i].cur;tr+=st[i].ref;}
+    let ty=0,tyr=0;
+    if(stY)for(const i of team.sIdxs){ty+=stY[i].cur;tyr+=stY[i].ref;}
+    html+=`<div class="teamband"><div class="teamhead">
+      <span class="tname">${esc(team.name)}</span>
+      <span style="color:var(--mut2);font-size:11.5px">${team.sIdxs.length} setores</span>
+      ${stY?`<span style="color:var(--mut);font-size:12px">YTD <b class="num" style="color:var(--txt)">${fmtBRL(ty)}</b> ${evoHtml(ty,tyr)}</span>`:''}
+      <span class="ttot num">${fmtBRL(tc)}</span><span class="tev">${evoHtml(tc,tr,pd.refLbl)}</span>
+    </div><table class="stbl"><thead><tr>
+      <th>Setor</th><th>Nome</th><th class="r">Bricks</th><th class="r">${esc(pd.lbl)}</th><th class="r">Evo ${esc(pd.lbl)}</th>${stY?'<th class="r">YTD 26</th><th class="r">Evo YTD</th>':''}
+    </tr></thead><tbody>`;
+    for(const i of team.sIdxs){
+      const s=S.setores[i],t=st[i];
+      const L=efLinha(i);
+      const conv=S.linhaOv.has(i);
+      const nConf=conv?sectorConflicts(i).length:0;
+      html+=`<tr class="${L===0?'lP':'lI'}" onclick="openSector(${i})">
+        <td class="snum num" title="Linha ${LNAME[L]}"><i></i>${s.num}</td>
+        <td class="snome">${esc(s.nomeEstudo||s.nome)}
+          ${conv?`<span class="badge bAlt">convertido para ${LNAME[L]}</span>`:''}
+          ${nConf?`<span class="badge bZero">${nConf} conflito${nConf>1?'s':''}</span>`:''}
+          ${t.recv||t.lost?`<span class="badge bAlt">${t.recv?'+'+t.recv:''}${t.recv&&t.lost?' ':''}${t.lost?'-'+t.lost:''}</span>`:''}
+          ${s.semVendas?'<span class="badge bZero">sem vendas</span>':''}</td>
+        <td class="snb num r">${t.nb}</td>
+        <td class="sval num r">${fmtBRL(t.cur)}</td>
+        <td class="sev num r">${evoHtml(t.cur,t.ref)}</td>
+        ${stY?`<td class="sval num r" style="font-weight:600">${fmtBRL(stY[i].cur)}</td>
+        <td class="sev num r">${evoHtml(stY[i].cur,stY[i].ref)}</td>`:''}
+      </tr>`;
+    }
+    html+='</tbody></table></div>';
+  }
+  $('teamsView').innerHTML=html;
+}
+function renderMarcas(){
+  const pd=cache.bs.pd;
+  const stride=S.nM+3;
+  const nMar=S.marcas.length;
+  const cur=new Float64Array(nMar),ref=new Float64Array(nMar);
+  for(let i=0;i<S.nCombos;i++){
+    const m=S.mArr[i],o=i*stride;
+    let c=0;for(const ix of pd.cur)c+=S.vArr[o+ix];
+    cur[m]+=c;
+    if(pd.hist>=0)ref[m]+=S.vArr[o+S.nM+pd.hist];
+    else for(const ix of pd.refIdxs)ref[m]+=S.vArr[o+ix];
+  }
+  // YTD por marca (independente do periodo selecionado)
+  const pdY=periodDef('ytd');
+  const curY=new Float64Array(nMar),refY=new Float64Array(nMar);
+  for(let i=0;i<S.nCombos;i++){
+    const m=S.mArr[i],o=i*stride;
+    let c=0;for(const ix of pdY.cur)c+=S.vArr[o+ix];
+    curY[m]+=c;
+    refY[m]+=S.vArr[o+S.nM+pdY.hist];
+  }
+  const order=S.marcas.map((_,i)=>i).sort((a,b)=>cur[b]-cur[a]);
+  let rows='';
+  const showY=S.period!=='ytd';
+  for(const m of order){
+    const L=linhaOf(m);
+    const changed=S.marcaOv.has(m);
+    const off=S.marcaOff.has(m);
+    rows+=`<tr${off?' class="moff"':''}>
+      <td style="font-weight:600">${esc(S.marcas[m].name)}${off?' <span class="badge bZero">excluída</span>':(changed?' <span class="badge bAlt">era '+LNAME[S.marcas[m].linha]+'</span>':'')}</td>
+      <td>${off?'<span style="color:var(--mut2);font-size:11.5px">fora da simulação</span>':`<div class="ltoggle">
+        <button class="${L===0?'onP':''}" onclick="setMarcaLinha(${m},0)">PRIME</button>
+        <button class="${L===1?'onI':''}" onclick="setMarcaLinha(${m},1)">INFINITY</button>
+      </div>`}</td>
+      <td class="td-r num">${fmtBRL(cur[m])}</td>
+      <td class="td-r">${evoHtml(cur[m],ref[m])}</td>
+      ${showY?`<td class="td-r num">${fmtBRL(curY[m])}</td>
+      <td class="td-r">${evoHtml(curY[m],refY[m])}</td>`:''}
+      <td class="td-r"><button class="linkbtn${off?'':' warn'}" onclick="toggleMarcaOff(${m})">${off?'restaurar':'excluir'}</button></td>
+    </tr>`;
+  }
+  $('marcasView').innerHTML=`<p style="color:var(--mut);font-size:12.5px;margin-bottom:12px">Ao trocar a linha de uma marca, as vendas dela em cada brick passam a contar para o setor da nova linha que atende aquele brick. Marcas excluídas saem de todos os totais da simulação. Período: ${esc(pd.lbl)}.</p>
+  <table><thead><tr><th>Marca</th><th>Linha na simulação</th><th class="td-r">${esc(pd.lbl)}</th><th class="td-r">Evo ${esc(pd.lbl)}</th>${showY?'<th class="td-r">YTD 26</th><th class="td-r">Evo YTD</th>':''}<th class="td-r"></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+// marcas excluidas por padrao da simulacao
+const DEFAULT_OFF=['NIMEGON','NIMEGON MET','HIXIZINE'];
+function applyDefaultOff(){
+  S.marcas.forEach((mc,m)=>{
+    const base=normTxt(mc.name).replace(/\s*\(.*\)$/,'').trim();
+    if(DEFAULT_OFF.includes(base))S.marcaOff.add(m);
+  });
+}
+function toggleMarcaOff(m){
+  if(S.marcaOff.has(m)){
+    S.marcaOff.delete(m);
+    toast('Marca '+S.marcas[m].name+' restaurada na simulação');
+  }else{
+    S.marcaOff.add(m);
+    toast('Marca '+S.marcas[m].name+' excluída da simulação');
+  }
+  renderAll();
+  if(modalSector>=0)renderSectorModal();
+}
+function setMarcaLinha(m,L){
+  if(S.marcas[m].linha===L)S.marcaOv.delete(m);
+  else S.marcaOv.set(m,L);
+  renderAll();
+  if(modalSector>=0)renderSectorModal();
+}
+
+/* ---------- conversao de linha ---------- */
+function sectorConflicts(sIdx){
+  if(!S.linhaOv.has(sIdx))return [];
+  const L=efLinha(sIdx);
+  const out=[];
+  for(const[k,dest]of S.brickOv){
+    if(dest!==sIdx)continue;
+    const[bStr,lStr]=k.split('|');
+    if(+lStr!==L)continue;
+    const b=+bStr;
+    const base=L===0?S.bricks[b].sP:S.bricks[b].sI;
+    if(base>=0&&base!==sIdx&&!S.setores[base].extinto&&efLinha(base)===L)out.push({b,other:base});
+  }
+  return out;
+}
+function convertSector(sIdx){
+  const L=efLinha(sIdx),L2=1-L;
+  const s=S.setores[sIdx];
+  const own=sectorBricks(sIdx).list;
+  if(!confirm('Converter '+s.num+' - '+(s.nomeEstudo||s.nome)+' de '+LNAME[L]+' para '+LNAME[L2]+'?\n\n'
+    +'O setor passa a absorver as vendas '+LNAME[L2]+' dos '+own.length+' bricks que ele visita. Bricks que ja pertencem a outro setor '+LNAME[L2]+' ficam marcados como conflito, com opcao de devolver.\n\n'
+    +'As vendas '+LNAME[L]+' desses bricks vao para o bloco A Realocar, para voce distribuir entre os setores '+LNAME[L]+'.'))return;
+  S.linhaOv.set(sIdx,L2);
+  for(const b of own){
+    const k=b+'|'+L2;
+    const base=L2===0?S.bricks[b].sP:S.bricks[b].sI;
+    if(base===sIdx)S.brickOv.delete(k);else S.brickOv.set(k,sIdx);
+  }
+  modalSel.clear();
+  renderAll();
+  if(modalSector>=0)renderSectorModal();
+  toast(s.num+' convertido para '+LNAME[L2]+'; vendas '+LNAME[L]+' dos bricks dele estao em A Realocar');
+}
+function revertConversion(sIdx){
+  const L2=efLinha(sIdx);
+  S.linhaOv.delete(sIdx);
+  for(const k of[...S.brickOv.keys()]){
+    if(S.brickOv.get(k)!==sIdx)continue;
+    if(+k.split('|')[1]===L2)S.brickOv.delete(k);
+  }
+  modalSel.clear();
+  renderAll();
+  if(modalSector>=0)renderSectorModal();
+  toast('Conversão desfeita; setor voltou para '+LNAME[efLinha(sIdx)]);
+}
+
+/* ---------- sector modal ---------- */
+let modalSector=-1,modalTab='bricks',modalSel=new Set();
+function openSector(i){
+  modalSector=i;modalTab='bricks';modalSel.clear();
+  $('sectorModalBg').classList.add('open');
+  renderSectorModal();
+}
+$('smClose').onclick=()=>{$('sectorModalBg').classList.remove('open');modalSector=-1;};
+$('sectorModalBg').onclick=e=>{if(e.target===$('sectorModalBg')){$('sectorModalBg').classList.remove('open');modalSector=-1;}};
+document.querySelectorAll('.mtabs button').forEach(b=>{
+  b.onclick=()=>{modalTab=b.dataset.mt;renderSectorModal();};
+});
+function sectorBricks(sIdx){
+  const L=efLinha(sIdx);
+  const out=[];
+  for(let b=0;b<S.bricks.length;b++){
+    if(sectorOf(b,L)===sIdx)out.push(b);
+  }
+  return{L,list:out};
+}
+function sectorLostBricks(sIdx){
+  const L=efLinha(sIdx);
+  const out=[];
+  for(const[k,dest]of S.brickOv){
+    const[bStr,lStr]=k.split('|');
+    if(+lStr!==L)continue;
+    const b=+bStr;
+    const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+    if(orig===sIdx&&dest!==sIdx)out.push({b,dest});
+  }
+  return out;
+}
+function renderSectorModal(){
+  if(modalSector<0)return;
+  const s=S.setores[modalSector];
+  const st=cache.st[modalSector],pd=cache.bs.pd;
+  const L=efLinha(modalSector);
+  const conv=S.linhaOv.has(modalSector);
+  const confs=sectorConflicts(modalSector);
+  $('smTitle').innerHTML=`${s.num} <span style="color:var(--mut2)">|</span> ${esc(s.nomeEstudo||s.nome)} <span class="badge ${L===0?'bP':'bI'}">${LNAME[L]}</span>${conv?` <span class="badge bAlt">convertido, era ${LNAME[s.linha]}</span>`:''}`;
+  let meta=`${esc(pd.lbl)}: <b class="num" style="color:var(--txt)">${fmtBRL(st.cur)}</b> ${evoHtml(st.cur,st.ref,pd.refLbl)} , ${st.nb} bricks`;
+  if(conv&&confs.length)meta+=` , <span style="color:var(--neg);font-weight:600">${confs.length} brick${confs.length>1?'s':''} em conflito</span>`;
+  if(s.antigo)meta+=`<br>Setor antigo: ${esc(s.antigo)}${s.espelho?' , espelho: '+esc(s.espelho):''}`;
+  meta+=`<br>${conv
+    ?`<button class="linkbtn" onclick="revertConversion(${modalSector})">Desfazer conversão (voltar para ${LNAME[s.linha]})</button>`
+    :`<button class="linkbtn" onclick="convertSector(${modalSector})">Converter setor para ${LNAME[1-L]}</button>`}`;
+  $('smMeta').innerHTML=meta;
+
+  const lost=sectorLostBricks(modalSector);
+  $('smTabSaidas').textContent='Saíram ('+lost.length+')';
+  document.querySelectorAll('.mtabs button').forEach(b=>b.classList.toggle('on',b.dataset.mt===modalTab));
+
+  if(modalTab==='bricks')renderModalBricks(pd);
+  else if(modalTab==='marcas')renderModalMarcas(pd);
+  else renderModalSaidas(lost,pd);
+}
+function renderModalBricks(pd){
+  const s=S.setores[modalSector];
+  const{L,list}=sectorBricks(modalSector);
+  const rows=list.map(b=>({b,cur:cache.bs.cur[b*2+L],ref:cache.bs.ref[b*2+L]}))
+    .sort((a,b)=>b.cur-a.cur);
+  const confMap=new Map();
+  for(const c of sectorConflicts(modalSector))confMap.set(c.b,c.other);
+  let html='';
+  if(s.sede)html+=`<div class="sedebox"><b>Sede prevista no estudo:</b> ${esc(s.sede)}</div>`;
+  if(confMap.size)html+=`<div class="sedebox" style="border-color:var(--neg);color:var(--neg)"><b>${confMap.size} bricks em conflito:</b> tomados de outro setor ${LNAME[L]} na conversão. Use devolver para retornar ao setor original.</div>`;
+  if(!rows.length){html+='<div class="emptymsg">Nenhum brick atribuído a este setor.</div>';$('smBody').innerHTML=html;renderModalFoot(L,0);return;}
+  html+=`<table><thead><tr>
+    <th style="width:26px"><input type="checkbox" id="selAll" onchange="toggleAllBricks(this.checked)"></th>
+    <th>Brick</th><th>Cidade</th><th class="td-r" style="text-align:right">${esc(pd.lbl)}</th><th class="td-r" style="text-align:right">Evo</th><th></th></tr></thead><tbody>`;
+  for(const r of rows){
+    const bi=S.bricks[r.b];
+    const orig=L===0?bi.sP:bi.sI;
+    const moved=S.brickOv.has(r.b+'|'+L);
+    html+=`<tr>
+      <td><input type="checkbox" ${modalSel.has(r.b)?'checked':''} onchange="toggleBrickSel(${r.b},this.checked)"></td>
+      <td style="font-weight:600">${esc(bi.name)}${confMap.has(r.b)?' <span class="badge bZero">conflito com '+S.setores[confMap.get(r.b)].num+' '+esc((S.setores[confMap.get(r.b)].nomeEstudo||S.setores[confMap.get(r.b)].nome).split(' ')[0])+'</span>':(moved&&orig>=0?' <span class="badge bAlt">de '+S.setores[orig].num+'</span>':'')}${moved&&orig<0?' <span class="badge bAlt">novo</span>':''}</td>
+      <td style="color:var(--mut)">${esc(bi.city)}</td>
+      <td class="td-r num" style="text-align:right">${fmtBRL(r.cur)}</td>
+      <td class="td-r" style="text-align:right">${evoHtml(r.cur,r.ref)}</td>
+      <td style="text-align:right">${moved?`<button class="linkbtn" onclick="undoBrick(${r.b},${L})">devolver</button>`:''}</td>
+    </tr>`;
+  }
+  html+='</tbody></table>';
+  $('smBody').innerHTML=html;
+  renderModalFoot(L,rows.length);
+}
+function renderModalFoot(L,n){
+  if(modalTab!=='bricks'){$('smFoot').innerHTML='';return;}
+  const opts=destOptions(L,modalSector);
+  $('smFoot').innerHTML=`
+    <span class="cnt"><span id="selCnt">${modalSel.size}</span> de ${n} bricks selecionados</span>
+    <select id="destSel"><option value="">Mover para...</option>${opts}</select>
+    <button class="btn primary" onclick="moveSelected()">Mover selecionados</button>`;
+}
+function toggleAllBricks(on){
+  const{L,list}=sectorBricks(modalSector);
+  modalSel.clear();
+  if(on)list.forEach(b=>modalSel.add(b));
+  renderSectorModal();
+}
+function toggleBrickSel(b,on){
+  if(on)modalSel.add(b);else modalSel.delete(b);
+  const c=$('selCnt');if(c)c.textContent=modalSel.size;
+}
+function moveSelected(){
+  const dest=+($('destSel').value);
+  if(!$('destSel').value){toast('Escolha o setor de destino');return;}
+  if(!modalSel.size){toast('Selecione ao menos um brick');return;}
+  const L=efLinha(modalSector);
+  let n=0;
+  for(const b of modalSel){
+    const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+    const k=b+'|'+L;
+    if(orig===dest)S.brickOv.delete(k);
+    else S.brickOv.set(k,dest);
+    n++;
+  }
+  modalSel.clear();
+  renderAll();renderSectorModal();
+  toast(n+' brick'+(n>1?'s movidos':' movido')+' para '+S.setores[dest].num+' ('+LNAME[L]+')');
+}
+function undoBrick(b,L){
+  S.brickOv.delete(b+'|'+L);
+  modalSel.delete(b);
+  renderAll();
+  if(modalSector>=0)renderSectorModal();
+}
+function renderModalMarcas(pd){
+  const{L,list}=sectorBricks(modalSector);
+  const inSector=new Set(list);
+  const stride=S.nM+3;
+  const cur=new Map(),ref=new Map();
+  for(let i=0;i<S.nCombos;i++){
+    const m=S.mArr[i];
+    if(S.marcaOff.has(m))continue;
+    if(linhaOf(m)!==L)continue;
+    if(!inSector.has(S.bArr[i]))continue;
+    const o=i*stride;
+    let c=0;for(const ix of pd.cur)c+=S.vArr[o+ix];
+    let r=0;
+    if(pd.hist>=0)r=S.vArr[o+S.nM+pd.hist];
+    else for(const ix of pd.refIdxs)r+=S.vArr[o+ix];
+    cur.set(m,(cur.get(m)||0)+c);
+    ref.set(m,(ref.get(m)||0)+r);
+  }
+  const order=[...cur.keys()].sort((a,b)=>cur.get(b)-cur.get(a));
+  if(!order.length){$('smBody').innerHTML='<div class="emptymsg">Sem vendas de marcas da linha neste setor.</div>';$('smFoot').innerHTML='';return;}
+  let html=`<table><thead><tr><th>Marca</th><th class="td-r" style="text-align:right">${esc(pd.lbl)}</th><th class="td-r" style="text-align:right">Evo</th></tr></thead><tbody>`;
+  for(const m of order){
+    html+=`<tr><td style="font-weight:600">${esc(S.marcas[m].name)}${S.marcaOv.has(m)?' <span class="badge bAlt">trocada</span>':''}</td>
+      <td class="td-r num" style="text-align:right">${fmtBRL(cur.get(m))}</td>
+      <td class="td-r" style="text-align:right">${evoHtml(cur.get(m),ref.get(m))}</td></tr>`;
+  }
+  $('smBody').innerHTML=html+'</tbody></table>';
+  $('smFoot').innerHTML='';
+}
+function renderModalSaidas(lost,pd){
+  if(!lost.length){$('smBody').innerHTML='<div class="emptymsg">Nenhum brick saiu deste setor na simulação.</div>';$('smFoot').innerHTML='';return;}
+  const L=S.setores[modalSector].linha;
+  let html=`<table><thead><tr><th>Brick</th><th>Cidade</th><th>Foi para</th><th class="td-r" style="text-align:right">${esc(pd.lbl)}</th><th></th></tr></thead><tbody>`;
+  for(const{b,dest}of lost){
+    const bi=S.bricks[b];
+    html+=`<tr><td style="font-weight:600">${esc(bi.name)}</td>
+      <td style="color:var(--mut)">${esc(bi.city)}</td>
+      <td>${S.setores[dest].num} - ${esc(S.setores[dest].nomeEstudo||S.setores[dest].nome)}</td>
+      <td class="td-r num" style="text-align:right">${fmtBRL(cache.bs.cur[b*2+L])}</td>
+      <td style="text-align:right"><button class="linkbtn" onclick="undoBrick(${b},${L})">devolver</button></td></tr>`;
+  }
+  $('smBody').innerHTML=html+'</tbody></table>';
+  $('smFoot').innerHTML='';
+}
+
+/* ---------- changes modal ---------- */
+function openChanges(){
+  let html='';
+  for(const[k,dest]of S.brickOv){
+    const[bStr,lStr]=k.split('|');
+    const b=+bStr,L=+lStr;
+    const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+    html+=`<li><span class="badge ${L===0?'bP':'bI'}">${LNAME[L]}</span>
+      <span style="flex:1"><b>${esc(S.bricks[b].name)}</b><br><span style="color:var(--mut);font-size:11.5px">${orig>=0?S.setores[orig].num:'sem setor'} para ${S.setores[dest].num} - ${esc(S.setores[dest].nomeEstudo||S.setores[dest].nome)}</span></span>
+      <button class="linkbtn" onclick="undoBrick(${b},${L});openChanges()">desfazer</button></li>`;
+  }
+  for(const[m,L]of S.marcaOv){
+    html+=`<li><span class="badge bAlt">MARCA</span>
+      <span style="flex:1"><b>${esc(S.marcas[m].name)}</b><br><span style="color:var(--mut);font-size:11.5px">${LNAME[S.marcas[m].linha]} para ${LNAME[L]}</span></span>
+      <button class="linkbtn" onclick="setMarcaLinha(${m},${S.marcas[m].linha});openChanges()">desfazer</button></li>`;
+  }
+  for(const[i,L]of S.linhaOv){
+    const sx=S.setores[i];
+    html+=`<li><span class="badge bAlt">SETOR</span>
+      <span style="flex:1"><b>${sx.num} - ${esc(sx.nomeEstudo||sx.nome)}</b><br><span style="color:var(--mut);font-size:11.5px">convertido de ${LNAME[sx.linha]} para ${LNAME[L]}</span></span>
+      <button class="linkbtn" onclick="revertConversion(${i});openChanges()">desfazer</button></li>`;
+  }
+  for(const m of S.marcaOff){
+    html+=`<li><span class="badge bZero">MARCA</span>
+      <span style="flex:1"><b>${esc(S.marcas[m].name)}</b><br><span style="color:var(--mut);font-size:11.5px">excluída da simulação</span></span>
+      <button class="linkbtn" onclick="toggleMarcaOff(${m});openChanges()">desfazer</button></li>`;
+  }
+  $('chgList').innerHTML=html||'<li style="color:var(--mut2)">Nenhuma alteração feita.</li>';
+  $('changesModalBg').classList.add('open');
+}
+$('btnChanges').onclick=openChanges;
+$('cmClose').onclick=()=>$('changesModalBg').classList.remove('open');
+$('changesModalBg').onclick=e=>{if(e.target===$('changesModalBg'))$('changesModalBg').classList.remove('open');};
+
+/* ---------- topbar actions ---------- */
+document.querySelectorAll('#periodSeg button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#periodSeg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    S.period=b.dataset.p;
+    renderAll();
+    if(modalSector>=0)renderSectorModal();
+  };
+});
+document.querySelectorAll('#tabs button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    $('teamsView').style.display=b.dataset.t==='teams'?'block':'none';
+    $('marcasView').style.display=b.dataset.t==='marcas'?'block':'none';
+  };
+});
+$('btnReset').onclick=()=>{
+  if(!S.brickOv.size&&!S.marcaOv.size&&!S.marcaOff.size&&!S.linhaOv.size){toast('Nenhuma alteração para resetar');return;}
+  if(!confirm('Descartar todas as alterações da simulação?'))return;
+  S.brickOv.clear();S.marcaOv.clear();S.marcaOff.clear();S.linhaOv.clear();
+  applyDefaultOff();
+  localStorage.removeItem(LS_KEY);
+  renderAll();
+  if(modalSector>=0)renderSectorModal();
+  toast('Simulação resetada para a configuração original');
+};
+
+/* ---------- search ---------- */
+$('searchInp').oninput=()=>{
+  const q=normTxt($('searchInp').value);
+  const drop=$('searchDrop');
+  if(q.length<3){drop.style.display='none';return;}
+  const hits=[];
+  for(let b=0;b<S.bricks.length&&hits.length<30;b++){
+    const bi=S.bricks[b];
+    if(normTxt(bi.name).includes(q)||normTxt(bi.city).includes(q))hits.push(b);
+  }
+  if(!hits.length){drop.innerHTML='<div class="sr" style="color:var(--mut2)">Nenhum brick encontrado</div>';drop.style.display='block';return;}
+  let html='';
+  for(const b of hits){
+    const bi=S.bricks[b];
+    const sP=sectorOf(b,0),sI=sectorOf(b,1);
+    const tag=(sIdx,L)=>{
+      if(sIdx<0)return '';
+      const cls=L===0?'prime':'inf';
+      if(S.setores[sIdx].extinto||efLinha(sIdx)!==L)return `<span class="tg" onclick="goPending();$('searchDrop').style.display='none'"><span style="color:var(--${cls})">${LNAME[L]}</span> a realocar (era ${S.setores[sIdx].num})</span>`;
+      return `<span class="tg" onclick="openFromSearch(${sIdx})"><span style="color:var(--${cls})">${LNAME[L]}</span> ${S.setores[sIdx].num} ${esc(S.setores[sIdx].nomeEstudo||S.setores[sIdx].nome)}</span>`;
+    };
+    html+=`<div class="sr"><div class="bn">${esc(bi.name)}</div><div class="ct">${esc(bi.city)}</div>
+      ${tag(sP,0)}${tag(sI,1)}
+    </div>`;
+  }
+  drop.innerHTML=html;drop.style.display='block';
+};
+function openFromSearch(sIdx){
+  $('searchDrop').style.display='none';
+  $('searchInp').value='';
+  openSector(sIdx);
+}
+document.addEventListener('click',e=>{
+  if(!$('searchWrap').contains(e.target))$('searchDrop').style.display='none';
+});
+
+/* ---------- persistence ---------- */
+function saveLS(){
+  try{
+    const mb=[];
+    for(const[k,dest]of S.brickOv){
+      const[bStr,lStr]=k.split('|');
+      mb.push([S.bricks[+bStr].name,LKEY[+lStr],S.setores[dest].num]);
+    }
+    const mo=[];
+    for(const[m,L]of S.marcaOv)mo.push([S.marcas[m].name,LKEY[L]]);
+    const mx=[];
+    for(const m of S.marcaOff)mx.push(S.marcas[m].name);
+    const sl=[];
+    for(const[i,L]of S.linhaOv)sl.push([S.setores[i].num,LKEY[L]]);
+    localStorage.setItem(LS_KEY,JSON.stringify({mb,mo,mx,sl}));
+  }catch(e){}
+}
+function applySaved(){
+  let saved=null;
+  try{saved=JSON.parse(localStorage.getItem(LS_KEY)||'null');}catch(e){}
+  if(!saved)return;
+  const brickByName=new Map();S.bricks.forEach((b,i)=>brickByName.set(b.name,i));
+  const marcaByName=new Map();S.marcas.forEach((m,i)=>marcaByName.set(m.name,i));
+  const setorByNum=new Map();S.setores.forEach((s,i)=>setorByNum.set(s.num,i));
+  let n=0;
+  for(const[num,lk]of(saved.sl||[])){
+    const i=setorByNum.get(num);
+    if(i===undefined)continue;
+    const L=lk==='P'?0:1;
+    if(S.setores[i].linha!==L){S.linhaOv.set(i,L);n++;}
+  }
+  for(const[bn,lk,destNum]of(saved.mb||[])){
+    const b=brickByName.get(bn),dest=setorByNum.get(destNum);
+    const L=lk==='P'?0:1;
+    if(b===undefined||dest===undefined)continue;
+    const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+    if(orig===dest)continue;
+    S.brickOv.set(b+'|'+L,dest);n++;
+  }
+  for(const[mn,lk]of(saved.mo||[])){
+    const m=marcaByName.get(mn);
+    if(m===undefined)continue;
+    const L=lk==='P'?0:1;
+    if(S.marcas[m].linha!==L){S.marcaOv.set(m,L);n++;}
+  }
+  if('mx'in saved){
+    S.marcaOff.clear();
+    for(const mn of(saved.mx||[])){
+      const m=marcaByName.get(mn);
+      if(m===undefined)continue;
+      S.marcaOff.add(m);n++;
+    }
+  }
+  if(n)setTimeout(()=>toast(n+' alterações da simulação anterior reaplicadas'),400);
+}
+
+/* ---------- export setorizacao (formato da base original, com destaques) ---------- */
+function xesc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+$('btnExportSet').onclick=async()=>{
+  if(typeof JSZip==='undefined'){toast('Biblioteca de exportação ainda carregando, tente novamente');return;}
+  toast('Gerando setorização simulada...');
+  await new Promise(r=>setTimeout(r,30));
+  const nB=S.bricks.length,nM=S.nM;
+  // agregados por brick x linha: meses + TRI25/YTD25/MAT25, respeitando linha simulada e marcas excluidas
+  const mos=new Float64Array(nB*2*nM),his=new Float64Array(nB*2*3);
+  const stride=nM+3;
+  for(let i=0;i<S.nCombos;i++){
+    const m=S.mArr[i];
+    if(S.marcaOff.has(m))continue;
+    const L=linhaOf(m),b=S.bArr[i],o=i*stride,q=(b*2+L);
+    for(let k=0;k<nM;k++)mos[q*nM+k]+=S.vArr[o+k];
+    for(let h=0;h<3;h++)his[q*3+h]+=S.vArr[o+nM+h];
+  }
+  const pdY=periodDef('ytd'),pdT=periodDef('tri'),pdM=periodDef('mat');
+  // linhas da planilha
+  const recs=[];
+  for(let L=0;L<2;L++){
+    for(let b=0;b<nB;b++){
+      const sIdx=sectorOf(b,L);
+      if(sIdx<0||sIdx===undefined)continue;
+      const q=b*2+L;
+      let any=false;
+      for(let k=0;k<nM;k++)if(mos[q*nM+k]!==0){any=true;break;}
+      if(!any){for(let h=0;h<3;h++)if(his[q*3+h]!==0){any=true;break;}}
+      if(!any)continue;
+      const s=S.setores[sIdx];
+      const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+      const moved=S.brickOv.has(b+'|'+L);
+      const pend=!!s.extinto||efLinha(sIdx)!==L;
+      let alt='';
+      if(pend)alt='A REALOCAR (era '+s.num+' - '+s.nome+')';
+      else if(moved)alt=orig>=0?'REALOCADO DE '+S.setores[orig].num+' - '+(S.setores[orig].nomeEstudo||S.setores[orig].nome):'NOVO NO SETOR';
+      recs.push({L,b,q,sIdx,pend,moved,alt,
+        setor:pend?'A REALOCAR':(s.num+' - '+(s.nomeEstudo||s.nome))});
+    }
+  }
+  recs.sort((a,b)=>a.L-b.L||a.setor.localeCompare(b.setor)||S.bricks[a.b].city.localeCompare(S.bricks[b.b].city)||S.bricks[a.b].name.localeCompare(S.bricks[b.b].name));
+  // estilos: 0 padrao,1 header,2 num,3 pct | movidos: 4 txt,5 num,6 pct | a realocar: 7 txt,8 num,9 pct
+  const evo=(c,r)=>r>0.005?(c/r-1):null;
+  const sum=(q,idxs)=>{let t=0;for(const k of idxs)t+=mos[q*nM+k];return t;};
+  const head=['LINHA','SETOR','CIDADE','BRICK','ALTERAÇÃO',...S.months,'Evo. Mês','Evo. Mês Ano Ant.','TRI 25','TRI 26','Evo. TRI','YTD 25','YTD 26','Evo. YTD','MAT 25','MAT 26','Evo. MAT'];
+  let rowsXml='<row r="1">'+head.map((h,c)=>`<c r="${colRef(c)}1" t="inlineStr" s="1"><is><t>${xesc(h)}</t></is></c>`).join('')+'</row>';
+  let rn=2;
+  for(const r of recs){
+    const bi=S.bricks[r.b];
+    const base=r.pend?7:(r.moved?4:0);
+    const sN=base===0?0:base, sV=base===0?2:base+1, sP=base===0?3:base+2;
+    const q=r.q;
+    const mLast=mos[q*nM+nM-1],mPrev=nM>1?mos[q*nM+nM-2]:0,mAno=nM>=13?mos[q*nM+nM-13]:0;
+    const tri26=sum(q,pdT.cur),ytd26=sum(q,pdY.cur),mat26=sum(q,pdM.cur);
+    const tri25=his[q*3+0],ytd25=his[q*3+1],mat25=his[q*3+2];
+    const cells=[];
+    const txts=[LNAME[r.L],r.setor,bi.city,bi.name,r.alt];
+    txts.forEach((t,c)=>cells.push(`<c r="${colRef(c)}${rn}" t="inlineStr" s="${sN}"><is><t>${xesc(t)}</t></is></c>`));
+    let c=5;
+    const num=v=>{cells.push(`<c r="${colRef(c)}${rn}" s="${sV}"><v>${v.toFixed(2)}</v></c>`);c++;};
+    const pct=v=>{if(v===null)cells.push(`<c r="${colRef(c)}${rn}" s="${sN}"/>`);else cells.push(`<c r="${colRef(c)}${rn}" s="${sP}"><v>${v.toFixed(6)}</v></c>`);c++;};
+    for(let k=0;k<nM;k++)num(mos[q*nM+k]);
+    pct(evo(mLast,mPrev));pct(evo(mLast,mAno));
+    num(tri25);num(tri26);pct(evo(tri26,tri25));
+    num(ytd25);num(ytd26);pct(evo(ytd26,ytd25));
+    num(mat25);num(mat26);pct(evo(mat26,mat25));
+    rowsXml+=`<row r="${rn}">${cells.join('')}</row>`;
+    rn++;
+  }
+  const lastCol=colRef(head.length-1);
+  const cols=`<cols><col min="1" max="1" width="10" customWidth="1"/><col min="2" max="2" width="34" customWidth="1"/><col min="3" max="3" width="24" customWidth="1"/><col min="4" max="4" width="40" customWidth="1"/><col min="5" max="5" width="38" customWidth="1"/><col min="6" max="${head.length}" width="12.5" customWidth="1"/></cols>`;
+  const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14.5"/>${cols}<sheetData>${rowsXml}</sheetData><autoFilter ref="A1:${lastCol}1"/></worksheet>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.00"/><numFmt numFmtId="165" formatCode="0.0%"/></numFmts>
+<fonts count="2"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>
+<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF26323C"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE9E2F7"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF9E3E3"/></patternFill></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="10">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="0" applyFill="1"/>
+<xf numFmtId="164" fontId="0" fillId="3" borderId="0" applyNumberFormat="1" applyFill="1"/>
+<xf numFmtId="165" fontId="0" fillId="3" borderId="0" applyNumberFormat="1" applyFill="1"/>
+<xf numFmtId="0" fontId="0" fillId="4" borderId="0" applyFill="1"/>
+<xf numFmtId="164" fontId="0" fillId="4" borderId="0" applyNumberFormat="1" applyFill="1"/>
+<xf numFmtId="165" fontId="0" fillId="4" borderId="0" applyNumberFormat="1" applyFill="1"/>
+</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const zip=new JSZip();
+  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+  zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  zip.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="SETORIZACAO SIMULADA" sheetId="1" r:id="rId1"/></sheets></workbook>');
+  zip.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  zip.file('xl/styles.xml',styles);
+  zip.file('xl/worksheets/sheet1.xml',sheet);
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='SETORIZACAO_SIMULADA_AGO26.xlsx';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('Setorização simulada exportada ('+(rn-2)+' linhas)');
+};
+function colRef(c){let s='';c++;while(c>0){const m=(c-1)%26;s=String.fromCharCode(65+m)+s;c=Math.floor((c-1)/26);}return s;}
+
+/* ---------- export ---------- */
+$('btnExport').onclick=()=>{
+  const periods=['mes','tri','ytd','mat'];
+  const sums={},defs={};
+  for(const p of periods){const r=computeBrickSums(p);sums[p]=r;defs[p]=r.pd;}
+  const stByP={};
+  for(const p of periods)stByP[p]=computeSectorTotals(sums[p]);
+  const evoNum=(c,r)=>r>0.005?(c/r-1):(c>0.005?null:0);
+
+  // aba 1: resumo por setor
+  const head1=['EQUIPE','SETOR','NOME','LINHA','BRICKS',
+    'MES '+S.months[S.nM-1],'TRI 26','TRI 25','EVO TRI','YTD 26','YTD 25','EVO YTD','MAT 26','MAT 25','EVO MAT'];
+  const aoa1=[head1];
+  for(const team of S.teams){
+    for(const i of team.sIdxs){
+      const s=S.setores[i];
+      aoa1.push([team.name,s.num,s.nomeEstudo||s.nome,LNAME[efLinha(i)],stByP.mes[i].nb,
+        +stByP.mes[i].cur.toFixed(2),
+        +stByP.tri[i].cur.toFixed(2),+stByP.tri[i].ref.toFixed(2),evoNum(stByP.tri[i].cur,stByP.tri[i].ref),
+        +stByP.ytd[i].cur.toFixed(2),+stByP.ytd[i].ref.toFixed(2),evoNum(stByP.ytd[i].cur,stByP.ytd[i].ref),
+        +stByP.mat[i].cur.toFixed(2),+stByP.mat[i].ref.toFixed(2),evoNum(stByP.mat[i].cur,stByP.mat[i].ref)]);
+    }
+  }
+  // aba 2: bricks
+  const teamOfSector=new Map();
+  for(const team of S.teams)for(const i of team.sIdxs)teamOfSector.set(i,team.name);
+  const aoa2=[['LINHA','EQUIPE','SETOR','NOME','SETOR ORIGINAL','BRICK','CIDADE',
+    'MES '+S.months[S.nM-1],'TRI 26','YTD 26','MAT 26']];
+  for(let b=0;b<S.bricks.length;b++){
+    for(let L=0;L<2;L++){
+      const sIdx=sectorOf(b,L);
+      if(sIdx<0||sIdx===undefined)continue;
+      const s=S.setores[sIdx];
+      const orig=L===0?S.bricks[b].sP:S.bricks[b].sI;
+      const moved=S.brickOv.has(b+'|'+L);
+      const pend=!!s.extinto||efLinha(sIdx)!==L;
+      aoa2.push([LNAME[L],pend?'A REALOCAR':(teamOfSector.get(sIdx)||''),pend?'':s.num,pend?'setor desligado: '+s.num+' - '+s.nome:(s.nomeEstudo||s.nome),
+        pend?s.num:(moved&&orig>=0?S.setores[orig].num:''),
+        S.bricks[b].name,S.bricks[b].city,
+        +sums.mes.cur[b*2+L].toFixed(2),+sums.tri.cur[b*2+L].toFixed(2),
+        +sums.ytd.cur[b*2+L].toFixed(2),+sums.mat.cur[b*2+L].toFixed(2)]);
+    }
+  }
+  // aba 3: marcas
+  const stride=S.nM+3;
+  const mAgg=S.marcas.map(()=>({mes:0,tri:0,ytd:0,mat:0}));
+  for(let i=0;i<S.nCombos;i++){
+    const m=S.mArr[i],o=i*stride,a=mAgg[m];
+    for(const p of periods){
+      let c=0;for(const ix of defs[p].cur)c+=S.vArr[o+ix];
+      a[p]+=c;
+    }
+  }
+  const aoa3=[['MARCA','STATUS','LINHA ORIGINAL','LINHA SIMULADA','MES '+S.months[S.nM-1],'TRI 26','YTD 26','MAT 26']];
+  const orderM=S.marcas.map((_,i)=>i).sort((a,b)=>mAgg[b].mat-mAgg[a].mat);
+  for(const m of orderM){
+    aoa3.push([S.marcas[m].name,S.marcaOff.has(m)?'EXCLUÍDA':'ATIVA',LNAME[S.marcas[m].linha],LNAME[linhaOf(m)],
+      +mAgg[m].mes.toFixed(2),+mAgg[m].tri.toFixed(2),+mAgg[m].ytd.toFixed(2),+mAgg[m].mat.toFixed(2)]);
+  }
+  const wb=XLSX.utils.book_new();
+  const ws1=XLSX.utils.aoa_to_sheet(aoa1);
+  const ws2=XLSX.utils.aoa_to_sheet(aoa2);
+  const ws3=XLSX.utils.aoa_to_sheet(aoa3);
+  ws1['!cols']=[{wch:16},{wch:8},{wch:34},{wch:10},{wch:7},{wch:13},{wch:13},{wch:13},{wch:9},{wch:13},{wch:13},{wch:9},{wch:13},{wch:13},{wch:9}];
+  ws2['!cols']=[{wch:9},{wch:16},{wch:8},{wch:32},{wch:12},{wch:44},{wch:26},{wch:13},{wch:13},{wch:13},{wch:13}];
+  ws3['!cols']=[{wch:24},{wch:10},{wch:14},{wch:14},{wch:13},{wch:13},{wch:13},{wch:13}];
+  XLSX.utils.book_append_sheet(wb,ws1,'RESUMO SETORES');
+  XLSX.utils.book_append_sheet(wb,ws2,'BRICKS');
+  XLSX.utils.book_append_sheet(wb,ws3,'MARCAS');
+  XLSX.writeFile(wb,'SIMULACAO_SETORIZACAO_AGO26.xlsx');
+  toast('Excel exportado com resumo, bricks e marcas');
+};
+</script>
+</body>
+</html>
