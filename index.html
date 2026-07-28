@@ -156,28 +156,37 @@ tr.moff td .badge{opacity:1}
 #marcasView th.td-r{text-align:right}
 
 /* ---------- modal ---------- */
-.modalBg{position:fixed;inset:0;background:rgba(20,35,45,.45);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:34px 16px;overflow:auto}
+.modalBg{position:fixed;inset:0;background:rgba(20,35,45,.45);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:14px 16px;overflow:auto}
 .modalBg.open{display:flex}
-.modal{background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:980px;box-shadow:0 30px 80px rgba(20,35,45,.25)}
-.mhead{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.modal{background:var(--panel);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:1200px;box-shadow:0 30px 80px rgba(20,35,45,.25);display:flex;flex-direction:column;max-height:calc(100vh - 28px)}
+.mhead{padding:12px 22px 10px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;flex:none}
 .mhead h2{font-size:18px;font-weight:800}
-.mhead .meta{color:var(--mut);font-size:12px;margin-top:4px;line-height:1.6}
-.mhead .mclose{margin-left:auto;background:transparent;border:0;color:var(--mut);font-size:22px;line-height:1;padding:4px 8px}
+.mhleft{flex:1 1 340px;min-width:280px}
+.mhright{flex:0 1 auto;display:flex;flex-direction:column;gap:6px;padding-top:2px}
+.mhright .mrrow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
+.mhright .mrlb{color:var(--mut2);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;min-width:44px}
+.mhead .meta{color:var(--mut);font-size:12px;margin-top:3px;line-height:1.45}
+.mhead .mclose{margin-left:0;background:transparent;border:0;color:var(--mut);font-size:22px;line-height:1;padding:0 4px;flex:none}
 .mhead .mclose:hover{color:var(--txt)}
-.mtabs{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--border)}
-.mtabs button{background:transparent;border:0;color:var(--mut);padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+.mtabs{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--border);flex:none}
+.mtabs button{background:transparent;border:0;color:var(--mut);padding:8px 14px;font-size:12.5px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
 .mtabs button.on{color:var(--txt);border-bottom-color:var(--txt)}
-.mbody{padding:16px 22px;max-height:56vh;overflow:auto}
+.mbody{padding:0 22px 16px;flex:1 1 auto;min-height:0;overflow:auto}
 .mbody table{width:100%;border-collapse:collapse}
-.mbody th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut2);padding:6px 8px;font-weight:600;border-bottom:1px solid var(--border);position:sticky;top:-16px;background:var(--panel)}
-.mbody td{padding:7px 8px;border-bottom:1px solid var(--border);font-size:12.5px}
+.mbody th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut2);padding:12px 8px 6px;font-weight:600;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);z-index:1}
+.mbody td{padding:6px 8px;border-bottom:1px solid var(--border);font-size:12.5px}
 .mbody tr:hover td{background:var(--panel2)}
-.mfoot{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.mfoot select{background:var(--panel2);border:1px solid var(--border2);border-radius:8px;color:var(--txt);padding:8px 10px;font-size:12.5px;max-width:340px}
+.mfoot{padding:9px 22px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:none}
+.mfoot select{background:var(--panel2);border:1px solid var(--border2);border-radius:8px;color:var(--txt);padding:6px 10px;font-size:12.5px;max-width:340px}
 .mfoot .cnt{color:var(--mut);font-size:12px}
 .linkbtn{background:transparent;border:0;color:var(--inf);font-size:11.5px;font-weight:600;padding:0}
 .linkbtn:hover{text-decoration:underline}
-.sedebox{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11.5px;color:var(--mut);line-height:1.6;margin-bottom:14px}
+.sedebox{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11.5px;color:var(--mut);line-height:1.5;margin:12px 0 12px}
+.mbody>.sedebox:first-child{margin-top:12px}
+.sedebox .sdtxt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sedebox.exp .sdtxt{-webkit-line-clamp:unset;overflow:visible}
+.sedebox .sdtog{background:transparent;border:0;color:var(--inf);font-size:11px;font-weight:600;padding:2px 0 0;cursor:pointer}
+.emptymsg{padding-top:16px}
 .emptymsg{color:var(--mut2);font-size:13px;padding:20px 0;text-align:center}
 
 /* changes modal */
@@ -257,10 +266,11 @@ tr.moff td .badge{opacity:1}
 <div class="modalBg" id="sectorModalBg">
   <div class="modal">
     <div class="mhead">
-      <div>
+      <div class="mhleft">
         <h2 id="smTitle"></h2>
         <div class="meta" id="smMeta"></div>
       </div>
+      <div class="mhright" id="smMetaR"></div>
       <button class="mclose" id="smClose">&times;</button>
     </div>
     <div class="mtabs">
@@ -1286,15 +1296,18 @@ function renderSectorModal(){
   $('smTitle').innerHTML=`${s.num} <span style="color:var(--mut2)">|</span> ${esc(s.nomeEstudo||s.nome)} <span class="badge ${L===0?'bP':'bI'}">${LNAME[L]}</span>${conv?` <span class="badge bAlt">convertido, era ${LNAME[s.linha]}</span>`:''}`;
   let meta=`${esc(pd.lbl)}: <b class="num" style="color:var(--txt)">${fmtBRL(st.cur)}</b> ${evoHtml(st.cur,st.ref,pd.refLbl)} , ${st.nb} bricks`;
   if(conv&&confs.length)meta+=` , <span style="color:var(--neg);font-weight:600">${confs.length} brick${confs.length>1?'s':''} em conflito</span>`;
-  if(s.antigo)meta+=`<br>Setor antigo: ${esc(s.antigo)}${s.espelho?' , espelho: '+esc(s.espelho):''}`;
+  if(s.antigo)meta+=` <span style="color:var(--mut2)">|</span> Setor antigo ${esc(s.antigo)}${s.espelho?', espelho '+esc(s.espelho):''}`;
+  $('smMeta').innerHTML=meta;
+  // coluna direita: equipe + acao de conversao, ocupando o espaco superior
+  let mr='';
   if(S.teams.length>1){
     const curTeam=(S.teams.find(t=>t.sIdxs.includes(modalSector))||{}).name||'';
-    meta+=`<br>Equipe: <select class="teamsel" onchange="moveTeam(${modalSector},this.value)">${S.teams.map(t=>`<option value="${esc(t.name)}" ${t.name===curTeam?'selected':''}>${esc(t.name)}</option>`).join('')}</select>${S.teamOv.has(modalSector)?` <span style="color:var(--alt);font-size:11.5px">movido, original: ${esc(s.teamOrig||'')}</span>`:''}`;
+    mr+=`<div class="mrrow"><span class="mrlb">Equipe</span><select class="teamsel" onchange="moveTeam(${modalSector},this.value)">${S.teams.map(t=>`<option value="${esc(t.name)}" ${t.name===curTeam?'selected':''}>${esc(t.name)}</option>`).join('')}</select>${S.teamOv.has(modalSector)?`<span style="color:var(--alt);font-size:11px">movido de ${esc(s.teamOrig||'')}</span>`:''}</div>`;
   }
-  meta+=`<br>${conv
+  mr+=`<div class="mrrow"><span class="mrlb">Linha</span>${conv
     ?`<button class="linkbtn" onclick="revertConversion(${modalSector})">Desfazer conversão (voltar para ${LNAME[s.linha]})</button>`
-    :`<button class="linkbtn" onclick="convertSector(${modalSector})">Converter setor para ${LNAME[1-L]}</button>`}`;
-  $('smMeta').innerHTML=meta;
+    :`<button class="linkbtn" onclick="convertSector(${modalSector})">Converter para ${LNAME[1-L]}</button>`}</div>`;
+  $('smMetaR').innerHTML=mr;
 
   const lost=sectorLostBricks(modalSector);
   $('smTabSaidas').textContent='Saíram ('+lost.length+')';
@@ -1308,11 +1321,15 @@ function renderModalBricks(pd){
   const s=S.setores[modalSector];
   const{L,list}=sectorBricks(modalSector);
   const rows=list.map(b=>({b,cur:cache.bs.cur[b*2+L],ref:cache.bs.ref[b*2+L]}))
-    .sort((a,b)=>b.cur-a.cur);
+    .sort((a,b)=>{
+      const ca=normTxt(S.bricks[a.b].city),cb=normTxt(S.bricks[b.b].city);
+      if(ca!==cb)return ca<cb?-1:1;
+      return normTxt(S.bricks[a.b].name)<normTxt(S.bricks[b.b].name)?-1:1;
+    });
   const confMap=new Map();
   for(const c of sectorConflicts(modalSector))confMap.set(c.b,c.other);
   let html='';
-  if(s.sede)html+=`<div class="sedebox"><b>Sede prevista no estudo:</b> ${esc(s.sede)}</div>`;
+  if(s.sede)html+=`<div class="sedebox" id="sedeBox"><b>Sede prevista no estudo:</b> <span class="sdtxt">${esc(s.sede)}</span><button class="sdtog" onclick="const b=document.getElementById('sedeBox');b.classList.toggle('exp');this.textContent=b.classList.contains('exp')?'ver menos':'ver mais';">ver mais</button></div>`;
   if(confMap.size)html+=`<div class="sedebox" style="border-color:var(--neg);color:var(--neg)"><b>${confMap.size} bricks em conflito:</b> tomados de outro setor ${LNAME[L]} na conversão. Use devolver para retornar ao setor original.</div>`;
   if(!rows.length){html+='<div class="emptymsg">Nenhum brick atribuído a este setor.</div>';$('smBody').innerHTML=html;renderModalFoot(L,0);return;}
   html+=`<table><thead><tr>
